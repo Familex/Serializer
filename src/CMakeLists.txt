@@ -6,11 +6,11 @@ if (POLICY CMP0141)
   set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
 endif()
 
-project (Serializer)
+project (main)
 
-add_executable (Serializer "main.cpp")
+add_executable (main "main.cpp")
 
-# sub-projects.
-add_subdirectory ("Serializer")
+add_subdirectory ("serializer")
 
-target_link_libraries (Serializer PUBLIC Serializer_lib)
+target_link_libraries (main PUBLIC serializer)
+
