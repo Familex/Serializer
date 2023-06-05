@@ -1,4 +1,5 @@
 # Visual studio CMake artifacts
 .vs/
 out/
+.todo
 
