@@ -1,3 +1,4 @@
+#include "collection_print.hpp"
 #include "serializer.h"
 #include "yaml-cpp/yaml.h"
 
@@ -6,14 +7,36 @@
 
 int main()
 {
-    // example from yaml-cpp wiki
+    using namespace collection_print;
 
-    YAML::Node node = YAML::Load("{name: Brewers, city: Milwaukee}");
-    if (node["name"]) {
-        std::cout << node["name"].as<std::string>() << "\n";
+    try {
+        const auto file = YAML::LoadFile("yaml/prototype.yaml");
+        for (const auto& type : file["types"]) {
+            std::cout << "for type with tag '" << type["tag"] << "'" << std::endl;
+            for (std::size_t i{}; const auto& nested : type["nested"]) {
+                std::cout << "    ";
+
+                if (nested.IsScalar()) {
+                    std::cout << "tag: " << nested.Scalar() << std::endl;
+                }
+                else if (nested.IsMap()) {
+                    if (nested["regex"]) {
+                        std::cout << "regex: " << nested["regex"] << std::endl;
+                    }
+                    else if (nested["dyn-regex"]) {
+                        std::cout << "dyn-regex: " << nested["dyn-regex"] << std::endl;
+                    }
+                    else {
+                        std::cout << "unknown map nested" << std::endl;
+                    }
+                }
+                else {
+                    std::cout << "unknown nested" << std::endl;
+                }
+            }
+        }
     }
-    if (node["mascot"]) {
-        std::cout << node["mascot"].as<std::string>() << "\n";
+    catch (const std::exception& e) {
+        std::cout << e.what() << std::endl;
     }
-    assert(node.size() == 2);    // the previous call didn't create a node
 }

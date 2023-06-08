@@ -22,7 +22,9 @@ include_directories ("${yaml_cpp_SOURCE_DIR}/include")
 
 add_subdirectory ("src/serializer")
 
-add_executable (main "src/main.cpp")
+add_executable (main "src/main.cpp" "src/collection_print.hpp")
+
+set_property( TARGET main PROPERTY CXX_STANDARD 23 )
 
 # compile warnings
 target_compile_options(
