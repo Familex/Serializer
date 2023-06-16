@@ -1,0 +1,25 @@
+---
+# yaml-language-server: $schema=./schema_1.json
+version: 'example1'
+tags:
+- name: 'foo'
+  nested:
+  - 'bar'
+  - regex: (\\d+)\.
+    fields:
+      1: dot-stopped
+  - dyn-regex: (\\d{$1})
+    dyn-groups:
+      1: val-length
+    fields:
+      1: len-stopped
+  serialization-script: todo
+  deserialization-script: todo
+- name: 'bar'
+  nested:
+  - regex: (?:left)|(?:right)
+    fields:
+      0: left-right
+  serialization-script: todo
+  deserialization-script: todo
+...

@@ -1,0 +1,160 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "type": "object",
+    "description": "YAML schema for this serialization library config files",
+    "properties": {
+        "version": {
+            "type": "string",
+            "description": "config version"
+        },
+        "tags": {
+            "type": "array",
+            "description": "description of tags",
+            "items": {
+                "type": "object",
+                "description": "tag what can be use to serialize fields",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "tag name (kebab-case preferably)",
+                        "pattern": "^[\\w\\-]+$"
+                    },
+                    "nested": {
+                        "type": "array",
+                        "description": "pieces which describes tag [de]serialization",
+                        "$comment": "scope for nested tag fields are shared (use different names for different fields)",
+                        "items": {
+                            "oneOf": [
+                                {
+                                    "type": "string",
+                                    "description": "existing tag",
+                                    "pattern": "^[\\w\\-]+$"
+                                },
+                                {
+                                    "type": "object",
+                                    "description": "regex matched fields",
+                                    "properties": {
+                                        "regex": {
+                                            "type": "string",
+                                            "description": "pattern from https://stackoverflow.com/a/172316",
+                                            "pattern": "^((?:(?:[^?+*{}()[\\]\\\\|]+|\\\\.|\\[(?:\\^?\\\\.|\\^[^\\\\]|[^\\\\^])(?:[^\\]\\\\]+|\\\\.)*\\]|\\((?:\\?[:=!]|\\?<[=!]|\\?>)?(?1)??\\)|\\(\\?(?:R|[+-]?\\d+)\\))(?:(?:[?+*]|\\{\\d+(?:,\\d*)?\\})[?+]?)?|\\|)*)$"
+                                        },
+                                        "fields": {
+                                            "type": "object",
+                                            "description": "map regex groups to fields",
+                                            "propertyNames": {
+                                                "oneOf": [
+                                                    {
+                                                        "type": "number",
+                                                        "description": "group number (numbering same as in regex)"
+                                                    },
+                                                    {
+                                                        "type": "string",
+                                                        "description": "group custom name (given with (?<name>) syntax)"
+                                                    }
+                                                ]
+                                            },
+                                            "patternProperties": {
+                                                "^.+$": {
+                                                    "type": "string",
+                                                    "description": "context property name",
+                                                    "pattern": "^[\\w\\-]+$"
+                                                }
+                                            }
+                                        },
+                                        "look-around": {
+                                            "type": "object",
+                                            "description": "(?<=) or (?=) like groups",
+                                            "propertyNames": {
+                                                "type": "number",
+                                                "description": "look-around group number (numbering from one)"
+                                            },
+                                            "patternProperties": {
+                                                "^\\d+$": {
+                                                    "type": "string",
+                                                    "description": "context property name",
+                                                    "pattern": "^[\\w\\-]+$"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "type": "object",
+                                    "description": "dynamic regex matched fields (uses context to construct regex in runtime)",
+                                    "properties": {
+                                        "dyn-regex": {
+                                            "type": "string",
+                                            "description": "todo: pattern to match $1 things"
+                                        },
+                                        "dyn-groups": {
+                                            "type": "object",
+                                            "description": "dynamic groups",
+                                            "propertyNames": {
+                                                "type": "number",
+                                                "description": "dynamic group (the term doesn't refer to regex) number (numbering from one)"
+                                            },
+                                            "patternProperties": {
+                                                "^\\d+$": {
+                                                    "type": "string",
+                                                    "description": "context property name",
+                                                    "pattern": "^[\\w\\-]+$"
+                                                }
+                                            }
+                                        },
+                                        "fields": {
+                                            "type": "object",
+                                            "description": "map regex groups to fields",
+                                            "propertyNames": {
+                                                "oneOf": [
+                                                    {
+                                                        "type": "number",
+                                                        "description": "group number (numbering same as in regex)"
+                                                    },
+                                                    {
+                                                        "type": "string",
+                                                        "description": "group custom name (given with (?<name>) syntax)"
+                                                    }
+                                                ]
+                                            },
+                                            "patternProperties": {
+                                                "^.+$": {
+                                                    "type": "string",
+                                                    "description": "context property name",
+                                                    "pattern": "^[\\w\\-]+$"
+                                                }
+                                            }
+                                        },
+                                        "look-around": {
+                                            "type": "object",
+                                            "description": "(?<=) or (?=) like groups",
+                                            "propertyNames": {
+                                                "type": "number",
+                                                "description": "look-around group number (numbering from one)"
+                                            },
+                                            "patternProperties": {
+                                                "^\\d+$": {
+                                                    "type": "string",
+                                                    "description": "context property name",
+                                                    "pattern": "^[\\w\\-]+$"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "serialization-script": {
+                        "type": "string",
+                        "description": "lua script for properties to fields conversion"
+                    },
+                    "deserialization-script": {
+                        "type": "string",
+                        "description": "lua script for fields to properties conversion"
+                    }
+                }
+            }
+        }
+    }
+}
