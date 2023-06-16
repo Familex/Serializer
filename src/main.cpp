@@ -1,42 +1,48 @@
-#include "collection_print.hpp"
-#include "serializer.h"
-#include "yaml-cpp/yaml.h"
-
-#include <cassert>
 #include <iostream>
+#include <luwra.hpp>
+
+static void my_function_1(float num, const char* str)
+{
+    std::cout << "my_function_1(" << num << ", " << str << ")" << std::endl;
+}
+
+static std::string my_function_2() { return "World"; }
+
+static int my_function_3(int a, int b) { return a + b; }
 
 int main()
 {
-    using namespace collection_print;
+    luwra::StateWrapper state;
+    state.loadStandardLibrary();
 
-    try {
-        const auto file = YAML::LoadFile("yaml/prototype.yaml");
-        for (const auto& type : file["types"]) {
-            std::cout << "for type with tag '" << type["tag"] << "'" << std::endl;
-            for (std::size_t i{}; const auto& nested : type["nested"]) {
-                std::cout << "    ";
+    // Register 'my_function_1'
+    state["my_function_1"] = LUWRA_WRAP(my_function_1);
 
-                if (nested.IsScalar()) {
-                    std::cout << "tag: " << nested.Scalar() << std::endl;
-                }
-                else if (nested.IsMap()) {
-                    if (nested["regex"]) {
-                        std::cout << "regex: " << nested["regex"] << std::endl;
-                    }
-                    else if (nested["dyn-regex"]) {
-                        std::cout << "dyn-regex: " << nested["dyn-regex"] << std::endl;
-                    }
-                    else {
-                        std::cout << "unknown map nested" << std::endl;
-                    }
-                }
-                else {
-                    std::cout << "unknown nested" << std::endl;
-                }
-            }
-        }
+    // Register 'my_function_2'
+    state["my_function_2"] = LUWRA_WRAP(my_function_2);
+
+    // Register 'my_function_3'
+    state["my_function_3"] = LUWRA_WRAP(my_function_3);
+
+    // Load Lua code
+    int ret = state.runString(
+        // Invoke 'my_function_1'
+        "my_function_1(1337, 'Hello')\n"
+
+        // Invoke 'my_function_2'
+        "local result2 = my_function_2()\n"
+        "print('my_function_2() = ' .. result2)\n"
+
+        // Invoke 'my_function_3'
+        "local result3 = my_function_3(13, 37)\n"
+        "print('my_function_3(13, 37) = ' .. result3)\n"
+    );
+
+    // Invoke the attached script
+    if (ret != LUA_OK) {
+        std::cerr << "An error occured: " << state.read<std::string>(-1) << std::endl;
+        return 1;
     }
-    catch (const std::exception& e) {
-        std::cout << e.what() << std::endl;
-    }
+
+    return 0;
 }
