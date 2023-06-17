@@ -47,13 +47,13 @@ include_directories ("${yaml_cpp_SOURCE_DIR}/include")
 # Source
 #######################################
 
-add_subdirectory ("src/serializer")
+add_subdirectory ("src/dynser")
 
 add_executable (
     main
     "src/main.cpp"
-    "src/serializer/utils/collection_print.hpp"
-    "src/serializer/utils/lua_manual_debug.hpp"
+    "src/dynser/utils/collection_print.hpp"
+    "src/dynser/utils/lua_manual_debug.hpp"
 )
 
 set_property (TARGET main PROPERTY CXX_STANDARD 23)
@@ -73,7 +73,7 @@ target_compile_options (
 # link
 target_link_libraries (
     main
-    serializer
+    dynser
     # downloaded libs
     yaml-cpp
     lua_static
