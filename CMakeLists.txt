@@ -49,7 +49,12 @@ include_directories ("${yaml_cpp_SOURCE_DIR}/include")
 
 add_subdirectory ("src/serializer")
 
-add_executable (main "src/main.cpp" "src/collection_print.hpp")
+add_executable (
+    main
+    "src/main.cpp"
+    "src/serializer/utils/collection_print.hpp"
+    "src/serializer/utils/lua_manual_debug.hpp"
+)
 
 set_property (TARGET main PROPERTY CXX_STANDARD 23)
 

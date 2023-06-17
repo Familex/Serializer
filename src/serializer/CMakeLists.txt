@@ -1,4 +1,11 @@
-﻿add_library (serializer "serializer/serializer.cpp" "serializer/serializer.h" "serializer.h")
+﻿add_library (
+    serializer
+    "serializer/serializer.cpp"
+    "serializer/serializer.h"
+    "serializer.h"
+    "structs/fields.hpp"
+    "structs/properties.hpp"
+)
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET serializer PROPERTY CXX_STANDARD 20)

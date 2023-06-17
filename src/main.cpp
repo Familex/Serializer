@@ -1,48 +1,23 @@
-#include <iostream>
-#include <luwra.hpp>
+#define LUWRA_REGISTRY_PREFIX "DynSer#"
 
-static void my_function_1(float num, const char* str)
-{
-    std::cout << "my_function_1(" << num << ", " << str << ")" << std::endl;
-}
-
-static std::string my_function_2() { return "World"; }
-
-static int my_function_3(int a, int b) { return a + b; }
+#include "structs/properties.hpp"
+#include "utils/lua_manual_debug.hpp"
 
 int main()
 {
     luwra::StateWrapper state;
     state.loadStandardLibrary();
+    dyn_ser::register_userdata_property_value(state);
 
-    // Register 'my_function_1'
-    state["my_function_1"] = LUWRA_WRAP(my_function_1);
+    auto props = dyn_ser::Properties{ { "value", { 123ll } } };
+    state["props"] = props;
 
-    // Register 'my_function_2'
-    state["my_function_2"] = LUWRA_WRAP(my_function_2);
+    lua_debug::io_loop(state);
+    // λ> props['value-str'] = tostring(props['value']:as_int())
+    // λ> exit()
 
-    // Register 'my_function_3'
-    state["my_function_3"] = LUWRA_WRAP(my_function_3);
-
-    // Load Lua code
-    int ret = state.runString(
-        // Invoke 'my_function_1'
-        "my_function_1(1337, 'Hello')\n"
-
-        // Invoke 'my_function_2'
-        "local result2 = my_function_2()\n"
-        "print('my_function_2() = ' .. result2)\n"
-
-        // Invoke 'my_function_3'
-        "local result3 = my_function_3(13, 37)\n"
-        "print('my_function_3(13, 37) = ' .. result3)\n"
-    );
-
-    // Invoke the attached script
-    if (ret != LUA_OK) {
-        std::cerr << "An error occured: " << state.read<std::string>(-1) << std::endl;
-        return 1;
-    }
-
-    return 0;
+    std::cout << "lua state props table: \n";
+    lua_debug::print_table(state, "props");
+    // value: userdata
+    // value-str: 123
 }
