@@ -1,23 +1,49 @@
 #define LUWRA_REGISTRY_PREFIX "DynSer#"
 
-#include "structs/properties.hpp"
-#include "utils/lua_manual_debug.hpp"
+#include "dynser.h"
+
+struct Foo
+{
+    int quux;
+};
+
+struct Bar
+{
+    Foo foo;
+    int baz;
+};
 
 int main()
 {
-    luwra::StateWrapper state;
-    state.loadStandardLibrary();
-    dynser::register_userdata_property_value(state);
-
-    auto props = dynser::Properties{ { "value", { 123ll } } };
-    state["props"] = props;
-
-    lua_debug::io_loop(state);
-    // λ> props['value-str'] = tostring(props['value']:as_int())
-    // λ> exit()
-
-    std::cout << "lua state props table: \n";
-    lua_debug::print_table(state, "props");
-    // value: userdata
-    // value-str: 123
+    // clang-format off
+    dynser::DynSer ser{
+        dynser::CDStrategy{
+            "foo",
+            [](dynser::Context&, dynser::Properties&& props) {
+                return Foo{ std::any_cast<int>(props["foo-quux"].data) };
+            },
+            [](dynser::Context&, Foo&& target) {
+                return dynser::Properties{
+                    { "foo-quux-field", { target.quux } }
+                };
+            }
+        },
+        dynser::CDStrategy{
+            "bar",
+            [](dynser::Context&, dynser::Properties&& props) {
+                return Bar
+                {
+                    Foo{ std::any_cast<int>(props["bar-foo-quux"].data) },
+                    std::any_cast<int>(props["bar-baz"])
+                };
+            },
+            [](dynser::Context&, Bar&& target) {
+                return dynser::Properties{
+                    { "bar-foo-field", { target.foo.quux } },
+                    { "bar-baz-field", { target.baz } }
+                };
+            }
+        }
+    };
+    // clang-format on
 }
