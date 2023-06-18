@@ -1,58 +1,48 @@
 ﻿#pragma once
 
 #include "structs/context.hpp"
-#include <type_traits>
-
-#include <string>
-#include <variant>
-#include <vector>
 
 namespace dynser
 {
-
-template <typename Target, typename PropertiesToTargetMapper, typename TargetToPropertiesMapper>
-    requires requires(
-        Context& ctx,
-        Target&& target,
-        Properties&& props,
-        PropertiesToTargetMapper prop_to_targ,
-        TargetToPropertiesMapper targ_to_prop
-    ) {
-        // clang-format off
-        { targ_to_prop(ctx, std::move(target)) } -> std::same_as<Properties>;
-        { prop_to_targ(ctx, std::move(props)) } -> std::same_as<Target>;
-        // clang-format on
-    }
-struct CDStrategy
+/**
+ * \brief receives `void(*)(Context&, Properties&&, Target&)`.
+ */
+template <typename... Fs>
+struct PropertyToTargetMapper : Fs...
 {
-    using Targ = Target;
-    using PTTM = PropertiesToTargetMapper;
-    using TTPM = TargetToPropertiesMapper;
-
-    std::string tag;
-    PropertiesToTargetMapper prop_to_targ;
-    TargetToPropertiesMapper targ_to_prop;
+    using Fs::operator()...;
 };
+template <typename... Fs>
+PropertyToTargetMapper(Fs...) -> PropertyToTargetMapper<Fs...>;
 
-template <typename PTTM, typename TTPM>
-explicit CDStrategy(std::string, PTTM, TTPM)
-    -> CDStrategy<std::invoke_result_t<PTTM, Context&, Properties&&>, PTTM, TTPM>;
+/**
+ * \brief receives `Properties(*)(Context&, Target&&)`.
+ */
+template <typename... Fs>
+struct TargetToPropertyMapper : Fs...
+{
+    using Fs::operator()...;
+};
+template <typename... Fs>
+TargetToPropertyMapper(Fs...) -> TargetToPropertyMapper<Fs...>;
 
-template <typename... Strategies>
+/**
+ * \brief string <=> target convertion based on Mappers and config file.
+ * \tparam PropertyToTargetMapper functor what receives properties struct (and context) and returns target.
+ * \tparam TargetToPropertyMapper functor what receives target (and context) and returns properties struct.
+ */
+template <typename PropertyToTargetMapper, typename TargetToPropertyMapper>
 class DynSer
 {
-    std::vector<std::variant<Strategies...>> strategies_;
-    Context context_{};
-
 public:
-    DynSer(Strategies&&... strategies) noexcept
-    {
-        (
-            [&] {
-                strategies_.emplace_back(std::move(strategies));
-            }(),
-            ...
-        );
-    }
+    const PropertyToTargetMapper pttm;
+    const TargetToPropertyMapper ttpm;
+    Context context;
+
+    DynSer(PropertyToTargetMapper&& pttm, TargetToPropertyMapper&& ttpm)
+      : pttm{ std::move(pttm) }
+      , ttpm{ std::move(ttpm) }
+    { }
 };
+
 }    // namespace dynser

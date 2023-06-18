@@ -17,32 +17,29 @@ int main()
 {
     // clang-format off
     dynser::DynSer ser{
-        dynser::CDStrategy{
-            "foo",
-            [](dynser::Context&, dynser::Properties&& props) {
-                return Foo{ std::any_cast<int>(props["foo-quux"].data) };
+        dynser::PropertyToTargetMapper{
+            [](dynser::Context&, dynser::Properties&& props, Foo& out) {
+                out = { std::any_cast<int>(props["foo-quux"].data) };
             },
-            [](dynser::Context&, Foo&& target) {
-                return dynser::Properties{
-                    { "foo-quux-field", { target.quux } }
-                };
-            }
-        },
-        dynser::CDStrategy{
-            "bar",
-            [](dynser::Context&, dynser::Properties&& props) {
-                return Bar
-                {
+            [](dynser::Context&, dynser::Properties&& props, Bar& out) {
+                out = {
                     Foo{ std::any_cast<int>(props["bar-foo-quux"].data) },
                     std::any_cast<int>(props["bar-baz"])
                 };
             },
+        },
+        dynser::TargetToPropertyMapper{
+            [](dynser::Context&, Foo&& target) {
+                return dynser::Properties{
+                    { "foo-quux-field", { target.quux } }
+                };
+            }, 
             [](dynser::Context&, Bar&& target) {
                 return dynser::Properties{
                     { "bar-foo-field", { target.foo.quux } },
                     { "bar-baz-field", { target.baz } }
                 };
-            }
+            },
         }
     };
     // clang-format on
