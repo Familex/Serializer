@@ -33,8 +33,8 @@ add_subdirectory ("src/dynser")
 add_executable (
     main
     "src/main.cpp"
-    "src/dynser/utils/collection_print.hpp"
-    "src/dynser/utils/lua_manual_debug.hpp"
+    "src/util/collection_print.hpp"
+    "src/util/lua_manual_debug.hpp"
 )
 
 set_property (TARGET main PROPERTY CXX_STANDARD 23)

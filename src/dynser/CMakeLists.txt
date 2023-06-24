@@ -10,6 +10,7 @@ add_library (
     "structs/fields.hpp"
     "structs/properties.hpp"
     "structs/context.hpp"
+    "util/prefix.hpp"
 )
 
 set_property (TARGET dynser PROPERTY CXX_STANDARD 23)

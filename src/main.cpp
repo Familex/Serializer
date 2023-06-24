@@ -2,31 +2,6 @@
 
 #include "dynser.h"
 
-namespace dynser::misc
-{
-
-Properties add_prefix(Properties&& props, std::string_view prefix) noexcept
-{
-    Properties result;
-    for (auto& [key, value] : props) {
-        result[prefix.data() + ('-' + key)] = std::move(value);
-    }
-    return result;
-}
-
-Properties remove_prefix(Properties& props, std::string_view prefix) noexcept
-{
-    Properties result;
-    for (auto& [key, value] : props) {
-        if (key.starts_with(prefix)) {
-            result.insert({ key.substr(prefix.size()), value });
-        }
-    }
-    return result;
-}
-
-}    // namespace dynser::misc
-
 int main()
 {
     struct Bar
@@ -89,7 +64,7 @@ int main()
             prop_to_bar,
             [&prop_to_bar](dynser::Context& ctx, dynser::Properties&& props, Foo& out) {
                 Bar bar;
-                prop_to_bar(ctx, dynser::misc::remove_prefix(props, "bar"), bar);
+                prop_to_bar(ctx, dynser::util::remove_prefix(props, "bar"), bar);
                 out = { bar,
                         std::any_cast<std::uint32_t>(props["dot-stopped"].data),
                         std::any_cast<std::uint32_t>(props["len-stopped"].data) };
@@ -98,15 +73,15 @@ int main()
             prop_to_pos,
             [&prop_to_pos](dynser::Context& ctx, dynser::Properties&& props, Input& out) {
                 Pos from, to;
-                prop_to_pos(ctx, dynser::misc::remove_prefix(props, "from"), from);
-                prop_to_pos(ctx, dynser::misc::remove_prefix(props, "to"), to);
+                prop_to_pos(ctx, dynser::util::remove_prefix(props, "from"), from);
+                prop_to_pos(ctx, dynser::util::remove_prefix(props, "to"), to);
                 out = { from, to };
             },
         },
         dynser::TargetToPropertyMapper{
             bar_to_prop,
             [&bar_to_prop](dynser::Context& ctx, const Foo& target) {
-                return dynser::misc::add_prefix(bar_to_prop(ctx, target.bar), "bar") + dynser::Properties{
+                return dynser::util::add_prefix(bar_to_prop(ctx, target.bar), "bar") + dynser::Properties{
                     { "dot-stopped", { target.dot } },
                     { "len-stopped", { target.dyn } },
                 };
@@ -116,8 +91,8 @@ int main()
             },
             pos_to_prop,
             [&pos_to_prop](dynser::Context& ctx, const Input& target) {
-                return dynser::misc::add_prefix(pos_to_prop(ctx, target.from), "from") +
-                       dynser::misc::add_prefix(pos_to_prop(ctx, target.to), "to");
+                return dynser::util::add_prefix(pos_to_prop(ctx, target.from), "from") +
+                       dynser::util::add_prefix(pos_to_prop(ctx, target.to), "to");
             },
         },
         dynser::ConfigFileName{ "./yaml/example2.yaml" }
