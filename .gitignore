@@ -2,4 +2,6 @@
 .vs/
 out/
 .todo
+private_*
+private/
 

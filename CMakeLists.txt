@@ -39,6 +39,12 @@ add_executable (
 
 set_property (TARGET main PROPERTY CXX_STANDARD 23)
 
+# yaml configs
+file(
+    COPY "${CMAKE_CURRENT_SOURCE_DIR}/yaml"
+    DESTINATION "${CMAKE_CURRENT_BINARY_DIR}"
+)
+
 # compile warnings
 target_compile_options (
     main

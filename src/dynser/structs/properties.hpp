@@ -21,12 +21,20 @@ struct PropertyValue
     decltype(auto) as_float() { return std::any_cast<double&>(data); }
 
     decltype(auto) as_string() { return std::any_cast<std::string&>(data); }
+
+    decltype(auto) as_bool() { return std::any_cast<bool&>(data); }
 };
 
 /**
  * \brief Named parts of type, what can be converted and projected to string.
  */
 using Properties = std::map<std::string, PropertyValue>;
+
+Properties operator+(Properties&& lhs, Properties&& rhs) noexcept
+{
+    lhs.merge(rhs);
+    return lhs;
+}
 
 void register_userdata_property_value(luwra::StateWrapper& state) noexcept
 {
