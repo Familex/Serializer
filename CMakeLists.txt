@@ -35,6 +35,13 @@ add_executable (
     "src/main.cpp"
     "src/util/collection_print.hpp"
     "src/util/lua_manual_debug.hpp"
+    "src/util/misc.hpp"
+)
+
+target_include_directories (
+    main
+    PRIVATE
+    "src/util"
 )
 
 set_property (TARGET main PROPERTY CXX_STANDARD 23)

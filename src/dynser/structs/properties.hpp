@@ -16,13 +16,19 @@ struct PropertyValue
 {
     std::any data;
 
-    decltype(auto) as_int() { return std::any_cast<long long&>(data); }
+    inline decltype(auto) as_int() { return std::any_cast<long long&>(data); }
 
-    decltype(auto) as_float() { return std::any_cast<double&>(data); }
+    inline decltype(auto) as_float() { return std::any_cast<double&>(data); }
 
-    decltype(auto) as_string() { return std::any_cast<std::string&>(data); }
+    inline decltype(auto) as_string() { return std::any_cast<std::string&>(data); }
 
-    decltype(auto) as_bool() { return std::any_cast<bool&>(data); }
+    inline decltype(auto) as_bool() { return std::any_cast<bool&>(data); }
+
+    inline decltype(auto) as_char() { return std::any_cast<char&>(data); }
+
+    inline decltype(auto) as_list() { return std::any_cast<std::vector<PropertyValue>&>(data); }
+
+    inline decltype(auto) as_map() { return std::any_cast<std::map<std::string, PropertyValue>&>(data); }
 };
 
 /**

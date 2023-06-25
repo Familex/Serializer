@@ -4,13 +4,14 @@
 
 add_library (
     dynser
-    "dynser/dynser.cpp"
-    "dynser/dynser.h"
     "dynser.h"
+
+    "dynser/dynser.h" "dynser/dynser.cpp"
     "structs/fields.hpp"
     "structs/properties.hpp"
     "structs/context.hpp"
     "util/prefix.hpp"
+    "config/config.h" "config/config.cpp"
 )
 
 set_property (TARGET dynser PROPERTY CXX_STANDARD 23)
