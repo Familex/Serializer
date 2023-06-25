@@ -4,7 +4,15 @@
 #include "misc.hpp"
 
 #include <cassert>
+#include <format>
+#include <iostream>
 #include <regex>
+
+template <typename... Fs>
+struct Overload : Fs...
+{
+    using Fs::operator()...;
+};
 
 int main()
 {
@@ -115,7 +123,7 @@ int main()
                          round_trip(from, "pos") && round_trip(input, "input");
     }
 
-    if constexpr (true) {
+    if constexpr (false) {
         using namespace dynser::config::details;
 
         const auto dyn_regex = yaml::DynRegex{ R"(\_2\[\d{\_1},\d{\_1}\])" };
@@ -129,5 +137,106 @@ int main()
         const auto res3 = std::regex_match("pos: [4,12]", std::regex{ with_prefix.value });
 
         assert(res0 && res1 && !res2 && !res3);
+    }
+
+    if constexpr (false) {
+        using namespace dynser::config::details::regex;
+
+        /*
+        const std::optional<Quantifier> test[]{ search_quantifier("?[abs]{3,4}"), search_quantifier("*[futnntusrnay"),
+                                                search_quantifier("{1,2}"),       search_quantifier("{1}"),
+                                                search_quantifier("{1,}"),        search_quantifier("{1}?"),
+                                                search_quantifier("{10,}?"),      search_quantifier("+?ft") };
+                                                */
+        const auto s = 2;
+    }
+
+    if constexpr (true) {
+        using namespace dynser::config::details::regex;
+
+        struct Printer
+        {
+            auto quantifier_as_str(Quantifier const& q) const -> std::string
+            {
+                if (q.to) {
+                    return std::format("Quantifier{{ from: {}, to: {}, is_lazy: {} }}", q.from, *q.to, q.is_lazy);
+                }
+                else {
+                    return std::format("Quantifier{{ from: {}, is_lazy: {} }}", q.from, q.is_lazy);
+                }
+            }
+            auto token_as_str(Token const& token) const -> std::string
+            {
+                return std::visit(
+                    Overload{
+                        [&](const Empty&) { return std::format("Empty{{ }}"); },
+                        [&](const WildCard& w) {
+                            return std::format("WildCard{{ quantifier: {} }}", quantifier_as_str(w.quantifier));
+                        },
+                        [&](const Group& gr) {
+                            return std::format(
+                                "Group{{ value: {}, is_capturing: {}, quantifier: {} }}",
+                                regex_as_str(*gr.value),
+                                gr.is_capturing,
+                                quantifier_as_str(gr.quantifier)
+                            );
+                        },
+                        [&](const Backreference& b) {
+                            return std::format(
+                                "Backreference{{ group_number: {}, quantifier: {} }}",
+                                b.group_number,
+                                quantifier_as_str(b.quantifier)
+                            );
+                        },
+                        [&](const Lookup& l) {
+                            return std::format(
+                                "Lookup{{ value: {}, is_negative: {} }}", regex_as_str(*l.value), l.is_negative
+                            );
+                        },
+                        [&](const CharacterClass& c) {
+                            return std::format(
+                                "CharacterClass{{ characters: {}, is_negative: {}, qantifier: {} }}",
+                                c.characters,
+                                c.is_negative,
+                                quantifier_as_str(c.quantifier)
+                            );
+                        },
+                        [&](const Disjunction& d) {
+                            return std::format(
+                                "Disjunction{{ left: {}, right: {} }}", regex_as_str(*d.left), regex_as_str(*d.right)
+                            );
+                        } },
+                    token
+                );
+            }
+
+            auto regex_as_str(Regex const& regex) const -> std::string
+            {
+                std::string result{ "Regex[ " };
+                for (const auto& el : regex.value) {
+                    result += token_as_str(el);
+                    result += ", ";
+                }
+                result.pop_back();
+                result.pop_back();
+                return result + " ]";
+            }
+        } p;
+
+        const Regex rs[]{
+            *from_string("((ke(((\\.+))))ab)"),
+            *from_string("(\\d+)\\."),
+            *from_string("(\\w*).{5,256}?"),
+            *from_string("a|b"),
+            *from_string("[ab]+|b"),
+            *from_string("a|b|3"),
+            *from_string("[astf]{2,}|futnun[^tfnu]*"),
+            *from_string("[astf]{2,}|futnun[^tfnu]*"),
+            *from_string("[\\d\\S\\]]{2,}\\10+"),
+        };
+
+        for (std::size_t num{}; const auto& r : rs) {
+            std::cout << "Regex #" << num++ << ": " << p.regex_as_str(r) << std::endl;
+        }
     }
 }
