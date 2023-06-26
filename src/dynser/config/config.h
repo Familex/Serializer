@@ -5,6 +5,7 @@
 #include <expected>
 #include <memory>
 #include <optional>
+#include <regex>
 #include <string>
 #include <variant>
 #include <vector>
@@ -70,31 +71,49 @@ struct Empty
 // fullstop symbol
 struct WildCard
 {
-    Quantifier quantifier;
+    const Quantifier quantifier;
 };
 
 struct Group
 {
-    std::unique_ptr<struct Regex> value;
-    bool is_capturing;
-    Quantifier quantifier;
+    const std::unique_ptr<struct Regex> value;
+    const bool is_capturing;
+    const Quantifier quantifier;
 
-    explicit Group(std::unique_ptr<struct Regex>&& value, bool is_capturing, Quantifier&& quantifier) noexcept;
+    // to vals check in regex::to_string
+    const std::regex regex;
+#ifdef _DEBUG
+    const std::string regex_str;
+#endif
+
+    // generated in regex::from_string
+    const std::size_t number;
+
+    explicit Group(
+        std::unique_ptr<struct Regex>&& value,
+        bool is_capturing,
+        Quantifier&& quantifier,
+        std::regex&& regex,
+#ifdef _DEBUG
+        std::string&& regex_str,
+#endif
+        std::size_t number = 0ull
+    ) noexcept;
     explicit Group(Group&& other) noexcept = default;
     Group(const Group& other) noexcept;
 };
 
 struct Backreference
 {
-    std::size_t group_number;
-    Quantifier quantifier;
+    const std::size_t group_number;
+    const Quantifier quantifier;
 };
 
 struct Lookup
 {
-    std::unique_ptr<struct Regex> value;
-    bool is_negative;
-    bool is_forward;    // true if forward lookup, false if backward
+    const std::unique_ptr<struct Regex> value;
+    const bool is_negative;
+    const bool is_forward;    // true if forward lookup, false if backward
 
     explicit Lookup(std::unique_ptr<struct Regex>&& value, bool is_negative, bool is_forward) noexcept;
     explicit Lookup(Lookup&& other) noexcept = default;
@@ -103,15 +122,15 @@ struct Lookup
 
 struct CharacterClass
 {
-    std::string characters;    // raw (without negation '^' symbol)
-    bool is_negative;
-    Quantifier quantifier;
+    const std::string characters;    // raw (without negation '^' symbol)
+    const bool is_negative;
+    const Quantifier quantifier;
 };
 
 struct Disjunction
 {
-    std::unique_ptr<Token> left;
-    std::unique_ptr<Token> right;
+    const std::unique_ptr<Token> left;
+    const std::unique_ptr<Token> right;
 
     explicit Disjunction(std::unique_ptr<Token>&& left, std::unique_ptr<Token>&& right) noexcept;
     explicit Disjunction(Disjunction&& other) noexcept = default;
@@ -120,7 +139,7 @@ struct Disjunction
 
 struct Regex
 {
-    std::vector<Token> value;
+    const std::vector<Token> value;
 };
 
 // error position if error

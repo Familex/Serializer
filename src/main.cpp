@@ -151,7 +151,7 @@ int main()
         const auto s = 2;
     }
 
-    if constexpr (true) {
+    if constexpr (false) {
         using namespace dynser::config::details::regex;
 
         // make print fuctions what referring to each other in this scope
@@ -163,9 +163,7 @@ int main()
                     return std::format("'without quantifier'");
                 }
                 if (q.to) {
-                    return std::format(
-                        "{{ from: {}, to: {}, is_lazy: {} }}", q.from, *q.to, q.is_lazy
-                    );
+                    return std::format("{{ from: {}, to: {}, is_lazy: {} }}", q.from, *q.to, q.is_lazy);
                 }
                 else {
                     return std::format("{{ from: {}, is_lazy: {} }}", q.from, q.is_lazy);
@@ -175,15 +173,16 @@ int main()
             {
                 return std::visit(
                     Overload{
-                        [&](const Empty&) { return std::format("empty: {{ }}"); },
+                        [&](const Empty&) { return std::format("{{ type: empty }}"); },
                         [&](const WildCard& w) {
                             return std::format("{{ type: wildcard, quantifier: {} }}", quantifier_as_str(w.quantifier));
                         },
                         [&](const Group& gr) {
                             return std::format(
-                                "{{ type: group, is_capturing: {}, quantifier: {}, value: {} }}",
+                                "{{ type: group, is_capturing: {}, quantifier: {}, number: {}, value: {} }}",
                                 gr.is_capturing,
                                 quantifier_as_str(gr.quantifier),
+                                gr.number,
                                 regex_as_str(*gr.value)
                             );
                         },
@@ -235,6 +234,7 @@ int main()
         } p;
 
         const std::expected<Regex, std::size_t> rs[]{
+            from_string("(a)(b)((c)((d)))"),
             from_string("((ke(((\\.+)+){0,0})?){20,25}ab)"),
             from_string("(?=[lookahead])"),
             from_string("(?![negative]|[lookahead])"),
@@ -244,15 +244,44 @@ int main()
             from_string("(\\w*).{5,256}?"),
             from_string("a|b"),
             from_string("[ab]+|b"),
-            from_string("a|b|3"),
+            from_string("|a|b|3"),
             from_string("[astf]{2,}|futnun[^tfnu]*"),
             from_string("[astf]{2,}|futnun[^tfnu]*"),
             from_string("[\\d\\S\\]]{2,}\\10+"),
+            from_string("(\\d{2,4})-(\\d{2,4})-(\\d{2,4})"),
         };
-
         // can be formatted as yaml list
         for (std::size_t num{}; const auto& r : rs) {
             std::cout << "- " << (r ? p.regex_as_str(*r) : std::format("'error on {} index'", r.error())) << "\n\n";
+        }
+    }
+
+    if constexpr (true) {
+        using namespace dynser::config::details::regex;
+        using dynser::config::details::yaml::GroupValues;
+        using Test = std::pair<std::string, GroupValues>;
+
+        Test tests[]{
+            { "(\\d{2})", { { 1, "999" } } },
+            { "(\\d+){2}", { { 1, "10" } } },
+            { "(\\d{2})", { { 1, "99" } } },
+            { "(\\d{2})", { { 1, "099" } } },
+            { "(.+)/(.+)", { { 1, "left" }, { 2, "right" } } },
+        };
+
+        for (std::size_t num{}; const auto& [reg, vals] : tests) {
+            std::cout << "test #" << num++ << ": ";
+            const auto r = from_string(reg);
+            if (!r) {
+                std::cout << std::format("parse error on {} index", r.error()) << std::endl;
+                continue;
+            }
+            const auto t = to_string(*r, vals);
+            if (!t) {
+                std::cout << std::format("resolve error on {} group", t.error().group_num) << std::endl;
+                continue;
+            }
+            std::cout << "result '" << *t << "'\n";
         }
     }
 }

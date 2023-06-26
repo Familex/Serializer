@@ -10,16 +10,35 @@ using namespace dynser::config;
 
 namespace dynser::config::details::regex
 {
-Group::Group(std::unique_ptr<Regex>&& value, bool is_capturing, Quantifier&& quantifier) noexcept
+Group::Group(
+    std::unique_ptr<Regex>&& value,
+    bool is_capturing,
+    Quantifier&& quantifier,
+    std::regex&& regex,
+#ifdef _DEBUG
+    std::string&& regex_str,
+#endif
+    std::size_t number
+) noexcept
   : value{ std::move(value) }
   , is_capturing{ is_capturing }
   , quantifier{ std::move(quantifier) }
+  , regex{ std::move(regex) }
+#ifdef _DEBUG
+  , regex_str{ std::move(regex_str) }
+#endif
+  , number{ number }
 { }
 
 Group::Group(const Group& other) noexcept
   : value{ new Regex{ *other.value } }
   , is_capturing{ other.is_capturing }
   , quantifier{ other.quantifier }
+  , regex{ other.regex }
+#ifdef _DEBUG
+  , regex_str{ other.regex_str }
+#endif
+  , number{ other.number }
 { }
 
 Lookup::Lookup(std::unique_ptr<Regex>&& value, bool is_negative, bool is_forward) noexcept
@@ -102,16 +121,6 @@ details::yaml::Regex details::resolve_dyn_regex(yaml::DynRegex&& dyn_reg, yaml::
     }) };
 }
 
-namespace
-{
-std::optional<std::string> try_relent(const std::string_view sv, const details::regex::Regex& reg) noexcept
-{
-    // FIXME implement
-    // e.g. try_relent("14", "\d{4}") → "0014"
-    return std::string{ sv };
-}
-}    // namespace
-
 details::regex::ToStringResult details::resolve_regex(yaml::Regex&& reg, yaml::GroupValues&& vals) noexcept
 {
     using namespace details::regex;
@@ -126,6 +135,7 @@ details::regex::ToStringResult details::resolve_regex(yaml::Regex&& reg, yaml::G
     return to_string(*reg_sus, std::move(vals));
 }
 
+// regex::from_string impl
 namespace
 {
 /**
@@ -255,13 +265,16 @@ constexpr std::optional<std::size_t> find_paired_bracket(const std::string_view 
 }
 
 std::expected<details::regex::Regex, std::size_t>
-parse_regex(const std::string_view sv) noexcept;    // forward declaration
+parse_regex(const std::string_view sv, std::size_t& last_group_number) noexcept;    // forward declaration
 
 /**
  * \brief Return parsed token (from sv begin) and it length or parse error position.
  */
-std::expected<std::pair<details::regex::Token, std::size_t>, std::size_t>
-parse_token(const std::string_view sv, details::regex::Regex& result) noexcept
+std::expected<std::pair<details::regex::Token, std::size_t>, std::size_t> parse_token(
+    const std::string_view sv,
+    std::vector<details::regex::Token>& result,
+    std::size_t& last_group_number
+) noexcept
 {
     using namespace details::regex;
 
@@ -321,20 +334,20 @@ parse_token(const std::string_view sv, details::regex::Regex& result) noexcept
         // disjunction
         case '|':
         {
-            auto right_sus = parse_token(sv.substr(1), result);
+            auto right_sus = parse_token(sv.substr(1), result, last_group_number);
             if (!right_sus) {
                 return std::unexpected{ right_sus.error() };
             }
             auto&& [right, right_len] = std::move(*right_sus);
-            if (result.value.empty()) {
+            if (result.empty()) {
                 return {
                     { { Disjunction{ std::make_unique<Token>(Empty{}), std::make_unique<Token>(std::move(right)) } },
                       right_len + 1 }
                 };
             }
             else {
-                Token left = std::move(result.value.back());
-                result.value.pop_back();
+                Token left = std::move(result.back());
+                result.pop_back();
                 return { { Disjunction{ std::make_unique<Token>(std::move(left)),
                                         std::make_unique<Token>(std::move(right)) },
 
@@ -354,11 +367,10 @@ parse_token(const std::string_view sv, details::regex::Regex& result) noexcept
         case '(':
         {
             ++token_len;
-            const auto is_lookahead{ sv.size() > 2 && sv[token_len] == '?' && sv[token_len + 1] == '!' ||
-                                     sv[token_len + 1] == '=' };
+            const auto is_lookahead{ sv.size() > 2 && sv[token_len] == '?' &&
+                                     (sv[token_len + 1] == '!' || sv[token_len + 1] == '=') };
             const auto is_lookbehind{ sv.size() > 3 && sv[token_len] == '?' && sv[token_len + 1] == '<' &&
-                                          sv[token_len + 2] == '!' ||
-                                      sv[token_len + 2] == '=' };
+                                      (sv[token_len + 2] == '!' || sv[token_len + 2] == '=') };
             if (is_lookahead || is_lookbehind) {
                 const auto is_forward{ is_lookahead };
                 const auto is_negative{ is_lookahead ? sv[token_len + 1] == '!' : sv[token_len + 2] == '!' };
@@ -370,7 +382,7 @@ parse_token(const std::string_view sv, details::regex::Regex& result) noexcept
                     return std::unexpected{ token_len };    // missmatched open bracket
                 }
                 const auto group_len = *group_end_sus - token_len;
-                auto group_sus = parse_regex(sv.substr(token_len, group_len));
+                auto group_sus = parse_regex(sv.substr(token_len, group_len), last_group_number);
                 if (!group_sus) {
                     return std::unexpected{ group_sus.error() };
                 }
@@ -384,20 +396,36 @@ parse_token(const std::string_view sv, details::regex::Regex& result) noexcept
                 token_len += 2;
             }
             // group parse
+            const auto group_start = token_len;
             const auto group_end_sus = find_paired_bracket<'(', ')'>(sv, 0);
             if (!group_end_sus) {
                 return std::unexpected{ token_len };    // missmatched open bracket
             }
             const auto group_len = *group_end_sus - token_len;
-            auto group_sus = parse_regex(sv.substr(token_len, group_len));
+            const auto current_group_number =
+                ++last_group_number;    // remember own group number, 'cause numbering in BFS
+            std::string group_str{ sv.substr(group_start, group_len) };
+            auto group_sus = parse_regex(group_str, last_group_number);
             if (!group_sus) {
                 return std::unexpected{ group_sus.error() };
+            }
+            std::regex regex;
+            try {
+                regex = std::regex{ group_str.data(), group_str.size() };
+            }
+            catch (const std::regex_error&) {
+                return std::unexpected{ group_start };
             }
             auto&& group = std::move(*group_sus);
             token_len += group_len + 1;    // skip ')'
             return { { Group{ std::make_unique<Regex>(std::move(group)),
                               !is_not_capturing,
-                              search_quantifier(sv.substr(token_len), &token_len).value_or(without_quantifier) },
+                              search_quantifier(sv.substr(token_len), &token_len).value_or(without_quantifier),
+                              std::move(regex),
+#ifdef _DEBUG
+                              std::move(group_str),
+#endif
+                              current_group_number },
                        token_len } };
         }
         // string begin (how to handle)
@@ -422,32 +450,150 @@ parse_token(const std::string_view sv, details::regex::Regex& result) noexcept
     }
 }
 
-std::expected<details::regex::Regex, std::size_t> parse_regex(const std::string_view sv) noexcept
+/**
+ * \brief Parse regex string into regex::Regex.
+ * \param sv string to parse.
+ * \param [in,out] last_group_number last group number in parse process.
+ * \return parsed regex.
+ */
+std::expected<details::regex::Regex, std::size_t>
+parse_regex(const std::string_view sv, std::size_t& last_group_number) noexcept
 {
     using namespace details::regex;
 
-    Regex result;
+    std::vector<Token> result;
     std::size_t curr{};
     while (curr < sv.size()) {
-        auto res_sus = parse_token(sv.substr(curr), result);
+        auto res_sus = parse_token(sv.substr(curr), result, last_group_number);
         if (!res_sus) {
             return std::unexpected{ curr + res_sus.error() };
         }
         auto&& [token, len] = std::move(*res_sus);
-        result.value.push_back(std::move(token));
+        result.push_back(std::move(token));
         curr += len;
     }
-    return result;
+    return Regex{ result };
 }
 }    // namespace
 
 std::expected<details::regex::Regex, std::size_t> details::regex::from_string(const std::string_view sv) noexcept
 {
-    return parse_regex(sv);
+    // lvalue-reference to [in,out] param
+    std::size_t last_group_number{};
+    return parse_regex(sv, last_group_number);
 }
+
+// regex::to_string impl
+namespace
+{
+template <typename... Fs>
+struct Overload : Fs...
+{
+    using Fs::operator()...;
+};
+
+/**
+ * \brief Apply minimal possible quantifier to string.
+ */
+constexpr std::string apply_quantifier(const std::string_view s, const details::regex::Quantifier& quantifier) noexcept
+{
+    std::string result;
+    for (std::size_t c{}; c < quantifier.from; ++c) {
+        result += s;
+    }
+    return result;
+}
+
+std::optional<std::string> try_relent(const std::string_view sv, const details::regex::Regex& reg) noexcept
+{
+    // FIXME not implemented
+    // e.g. try_relent("14", "\d{4}") → "0014"
+    return std::nullopt;
+}
+
+using CachedGroupValues = std::unordered_map<std::size_t, std::string>;
+
+details::regex::ToStringResult resolve_regex(
+    const details::regex::Regex& reg,
+    const ::dynser::config::details::yaml::GroupValues& vals,
+    CachedGroupValues& cached_group_values
+) noexcept;    // forward declaration
+
+details::regex::ToStringResult resolve_token(
+    const details::regex::Token& tok,
+    const ::dynser::config::details::yaml::GroupValues& vals,
+    CachedGroupValues& cached_group_values
+) noexcept
+{
+    using namespace details::regex;
+
+    return std::visit(
+        Overload{
+            [&](const Empty& value) -> ToStringResult { return ""; },
+            [&](const WildCard& value) -> ToStringResult { return apply_quantifier(".", value.quantifier); },
+            [&](const Group& value) -> ToStringResult {
+                // is_capturing is unused?
+                if (!vals.contains(value.number)) {
+                    return std::unexpected{ ToStringError{ ToStringErrorType::MissingValue, value.number } };
+                }
+                std::string str_group_val = vals.at(value.number);
+                if (!std::regex_match(str_group_val, value.regex)) {
+                    if (auto appropriate_group_val = try_relent(str_group_val, *value.value)) {
+                        str_group_val = std::move(*appropriate_group_val);
+                    }
+                    else {
+                        return std::unexpected{ ToStringError{ ToStringErrorType::InvalidValue,
+                                                               value.number } };    // can't fix wrong group val
+                    }
+                }
+                cached_group_values[value.number] = str_group_val;
+                return apply_quantifier(str_group_val, value.quantifier);
+            },
+            [&](const Backreference& value) -> ToStringResult {
+                // future groups can't be inserted (by regex rules, i guess)
+                if (cached_group_values.contains(value.group_number)) {
+                    return apply_quantifier(cached_group_values.at(value.group_number), value.quantifier);
+                }
+                return std::unexpected{ ToStringError{ ToStringErrorType::MissingValue, value.group_number } };
+            },
+            [&](const Lookup& value) -> ToStringResult {
+                return resolve_regex(*value.value, vals, cached_group_values);
+            },
+            [&](const CharacterClass& value) -> ToStringResult {
+                // FIXME not implemented
+                return "?";
+            },
+            [&](const Disjunction& value) -> ToStringResult {
+                return resolve_token(*value.left, vals, cached_group_values);
+            },
+        },
+        tok
+    );
+}
+
+details::regex::ToStringResult resolve_regex(
+    const details::regex::Regex& reg,
+    const ::dynser::config::details::yaml::GroupValues& vals,
+    CachedGroupValues& cached_group_values
+) noexcept
+{
+    using namespace details::regex;
+
+    std::string result;
+    for (const auto& token : reg.value) {
+        if (const auto str_sus = resolve_token(token, vals, cached_group_values)) {
+            result += *str_sus;
+        }
+        else {
+            return std::unexpected{ str_sus.error() };
+        }
+    }
+    return result;
+}
+}    // namespace
 
 details::regex::ToStringResult details::regex::to_string(const Regex& reg, const yaml::GroupValues& vals) noexcept
 {
-    // FIXME
-    return std::string{};
+    CachedGroupValues cached_group_values;    // for backreferences
+    return ::resolve_regex(reg, vals, cached_group_values);
 }
