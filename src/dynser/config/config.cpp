@@ -22,24 +22,26 @@ Group::Group(const Group& other) noexcept
   , quantifier{ other.quantifier }
 { }
 
-Lookup::Lookup(std::unique_ptr<Regex>&& value, bool is_negative) noexcept
+Lookup::Lookup(std::unique_ptr<Regex>&& value, bool is_negative, bool is_forward) noexcept
   : value{ std::move(value) }
   , is_negative{ is_negative }
+  , is_forward{ is_forward }
 { }
 
 Lookup::Lookup(const Lookup& other) noexcept
   : value{ new Regex{ *other.value } }
   , is_negative{ other.is_negative }
+  , is_forward{ other.is_forward }
 { }
 
-Disjunction::Disjunction(std::unique_ptr<Regex>&& left, std::unique_ptr<Regex>&& right) noexcept
+Disjunction::Disjunction(std::unique_ptr<Token>&& left, std::unique_ptr<Token>&& right) noexcept
   : left{ std::move(left) }
   , right{ std::move(right) }
 { }
 
 Disjunction::Disjunction(const Disjunction& other) noexcept
-  : left{ new Regex{ *other.left } }
-  , right{ new Regex{ *other.right } }
+  : left{ new Token{ *other.left } }
+  , right{ new Token{ *other.right } }
 { }
 }    // namespace dynser::config::details::regex
 
@@ -225,141 +227,206 @@ search_quantifier(const std::string_view sv, std::size_t* out /* = nullptr */) n
     }
     return std::nullopt;
 }
-}    // namespace
 
-std::expected<details::regex::Regex, std::size_t> details::regex::from_string(const std::string_view sv) noexcept
+/**
+ * \brief Return index of paired bracket of sv[resp_pos] else std::nullopt.
+ * \tparam open_bracket open bracket char.
+ * \tparam close_bracket close bracket char.
+ */
+template <char open_bracket, char close_bracket>
+constexpr std::optional<std::size_t> find_paired_bracket(const std::string_view sv, const std::size_t resp_pos) noexcept
 {
-    Regex result;
-
-    /**
-     * \brief Return parsed token (from sv begin) and it length or parse error position.
-     */
-    static auto parse_token = [](this auto& self, const std::string_view sv, Regex& result
-                              ) -> std::expected<std::pair<Token, std::size_t>, std::size_t> {
-        if (sv.empty()) {
-            return std::unexpected{ 0 };
+    if (sv[resp_pos] != open_bracket) {
+        return std::nullopt;
+    }
+    std::size_t open_brackets = 1;
+    for (std::size_t i = resp_pos + 1; i < sv.size(); ++i) {
+        if (sv[i] == open_bracket) {
+            ++open_brackets;
         }
+        else if (sv[i] == close_bracket) {
+            --open_brackets;
+            if (open_brackets == 0) {
+                return i;
+            }
+        }
+    }
+    return std::nullopt;
+}
 
-        std::size_t token_len{};
-        switch (sv[0]) {
-            // fullstop symbol
-            case '.':
-                ++token_len;
-                return { { WildCard{ search_quantifier(sv.substr(token_len), &token_len).value_or(without_quantifier) },
-                           token_len } };
-            // escaped character
-            case '\\':
-                ++token_len;
-                if (std::isdigit(sv[token_len])) {
-                    const auto backref = static_cast<std::size_t>(*svtoi(sv.substr(token_len)));
-                    token_len += number_len(backref);
-                    return { { Backreference{
-                                   backref,
-                                   search_quantifier(sv.substr(token_len), &token_len).value_or(without_quantifier) },
-                               token_len } };
-                }
-                else {
-                    ++token_len;
-                    return { { CharacterClass{
-                                   std::string{ { '\\', sv[token_len - 1] } },
-                                   false,
-                                   search_quantifier(sv.substr(token_len), &token_len).value_or(without_quantifier) },
-                               token_len } };
-                }
-            // character class
-            case '[':
-            {
-                ++token_len;
-                const auto is_negated = sv[token_len] == '^';
-                // search closing bracket (be aware of escaped variant)
-                std::size_t character_class_begin{ token_len + is_negated };
-                std::size_t character_class_end{ token_len + 1 };
-                // FIXME sv end handle (sv without ']')
-                while (sv[character_class_end] != ']' || sv[character_class_end - 1] == '\\') {
-                    ++character_class_end;
-                }
-                --character_class_end;                  // skip ']'
-                token_len = character_class_end + 2;    // skip ']'
+std::expected<details::regex::Regex, std::size_t>
+parse_regex(const std::string_view sv) noexcept;    // forward declaration
 
-                return { { CharacterClass{
-                               std::string{
-                                   sv.substr(character_class_begin, character_class_end - character_class_begin + 1) },
-                               is_negated,
+/**
+ * \brief Return parsed token (from sv begin) and it length or parse error position.
+ */
+std::expected<std::pair<details::regex::Token, std::size_t>, std::size_t>
+parse_token(const std::string_view sv, details::regex::Regex& result) noexcept
+{
+    using namespace details::regex;
+
+    if (sv.empty()) {
+        return std::unexpected{ 0 };
+    }
+
+    std::size_t token_len{};
+    switch (sv[0]) {
+        // fullstop symbol
+        case '.':
+            ++token_len;
+            return { { WildCard{ search_quantifier(sv.substr(token_len), &token_len).value_or(without_quantifier) },
+                       token_len } };
+        // escaped character
+        case '\\':
+            ++token_len;
+            if (std::isdigit(sv[token_len])) {
+                const auto backref = static_cast<std::size_t>(*svtoi(sv.substr(token_len)));
+                token_len += number_len(backref);
+                return { { Backreference{
+                               backref,
                                search_quantifier(sv.substr(token_len), &token_len).value_or(without_quantifier) },
                            token_len } };
             }
-            // disjunction
-            case '|':
-            {
-                auto right_sus = self(sv.substr(1), result);
-                if (!right_sus) {
-                    return std::unexpected{ right_sus.error() };
-                }
-                auto&& [right, right_len] = std::move(*right_sus);
-                if (result.value.empty()) {
-                    return { { { Disjunction{ std::make_unique<Regex>(std::vector<Token>{ Empty{} }),
-                                              std::make_unique<Regex>(std::vector<Token>{ std::move(right) }) } },
-                               right_len + 1 } };
-                }
-                else {
-                    Token left = result.value.back();
-                    result.value.pop_back();
-                    return { { Disjunction{ std::make_unique<Regex>(std::vector<Token>{ left }),
-                                            std::make_unique<Regex>(std::vector<Token>{ std::move(right) }) },
-                               right_len + 1 } };
-                }
-            }
-            // illegal here (regex is context sensitive)
-            case ']':
-            case ')':
-            case '{':
-            case '}':
-            case '+':
-            case '*':
-            case '?':
-                return std::unexpected{ 0 };
-            // group
-            case '(':
-            {
+            else {
                 ++token_len;
-                // find matching bracket and make loop like in outher function
-                bool is_capturing{ (sv.size() > 2 && sv[token_len] == '?' && sv[token_len + 1] == ':') };
-                if (is_capturing) {
-                    token_len += 2;
-                }
-                auto content_sus = self(sv.substr(token_len), result);
-                if (!content_sus) {
-                    return std::unexpected{ content_sus.error() };
-                }
-                auto&& [content, content_len] = std::move(*content_sus);
-                token_len += content_len;
-                return { { Group{ std::make_unique<Regex>(std::vector<Token>{ content }),
-                                  is_capturing,
-                                  search_quantifier(sv.substr(token_len), &token_len).value_or(without_quantifier) },
-                           token_len + 1 } };
-            }
-            // string begin (how to handle)
-            case '^':
-                // FIXME
-                // fall to prevent warnings
-                [[fallthrough]];
-            // string end (how to handle)
-            case '$':
-                // FIXME
-                [[fallthrough]];
-            // just character (like escaped)
-            default:
-                ++token_len;
-                std::string characters;
-                characters += sv[token_len - 1];    // FIXME make it in place (std::string{ 1, bla-bla }) doesn't worked
                 return { { CharacterClass{
-                               characters,
+                               std::string{ { '\\', sv[token_len - 1] } },
                                false,
                                search_quantifier(sv.substr(token_len), &token_len).value_or(without_quantifier) },
                            token_len } };
-        }
-    };
+            }
+        // character class
+        case '[':
+        {
+            ++token_len;
+            const auto is_negated = sv[token_len] == '^';
+            // search closing bracket (be aware of escaped variant)
+            std::size_t character_class_begin{ token_len + is_negated };
+            std::size_t character_class_end{ token_len + 1 };
+            // FIXME sv end handle (sv without ']')
+            while (sv[character_class_end] != ']' || sv[character_class_end - 1] == '\\') {
+                ++character_class_end;
+            }
+            --character_class_end;                  // skip ']'
+            token_len = character_class_end + 2;    // skip ']'
 
+            return {
+                { CharacterClass{
+                      std::string{ sv.substr(character_class_begin, character_class_end - character_class_begin + 1) },
+                      is_negated,
+                      search_quantifier(sv.substr(token_len), &token_len).value_or(without_quantifier) },
+                  token_len }
+            };
+        }
+        // disjunction
+        case '|':
+        {
+            auto right_sus = parse_token(sv.substr(1), result);
+            if (!right_sus) {
+                return std::unexpected{ right_sus.error() };
+            }
+            auto&& [right, right_len] = std::move(*right_sus);
+            if (result.value.empty()) {
+                return {
+                    { { Disjunction{ std::make_unique<Token>(Empty{}), std::make_unique<Token>(std::move(right)) } },
+                      right_len + 1 }
+                };
+            }
+            else {
+                Token left = std::move(result.value.back());
+                result.value.pop_back();
+                return { { Disjunction{ std::make_unique<Token>(std::move(left)),
+                                        std::make_unique<Token>(std::move(right)) },
+
+                           right_len + 1 } };
+            }
+        }
+        // illegal here (regex is context sensitive)
+        case ']':
+        case ')':
+        case '{':
+        case '}':
+        case '+':
+        case '*':
+        case '?':
+            return std::unexpected{ 0 };
+        // group | lookup
+        case '(':
+        {
+            ++token_len;
+            const auto is_lookahead{ sv.size() > 2 && sv[token_len] == '?' && sv[token_len + 1] == '!' ||
+                                     sv[token_len + 1] == '=' };
+            const auto is_lookbehind{ sv.size() > 3 && sv[token_len] == '?' && sv[token_len + 1] == '<' &&
+                                          sv[token_len + 2] == '!' ||
+                                      sv[token_len + 2] == '=' };
+            if (is_lookahead || is_lookbehind) {
+                const auto is_forward{ is_lookahead };
+                const auto is_negative{ is_lookahead ? sv[token_len + 1] == '!' : sv[token_len + 2] == '!' };
+                token_len += is_lookahead ? 2 : 3;
+
+                // group parse
+                const auto group_end_sus = find_paired_bracket<'(', ')'>(sv, 0);
+                if (!group_end_sus) {
+                    return std::unexpected{ token_len };    // missmatched open bracket
+                }
+                const auto group_len = *group_end_sus - token_len;
+                auto group_sus = parse_regex(sv.substr(token_len, group_len));
+                if (!group_sus) {
+                    return std::unexpected{ group_sus.error() };
+                }
+                auto&& group = std::move(*group_sus);
+                token_len += group_len + 1;    // skip ')'
+
+                return { { Lookup{ std::make_unique<Regex>(std::move(group)), is_negative, is_forward }, token_len } };
+            }
+            const bool is_not_capturing{ sv.size() > 2 && sv[token_len] == '?' && sv[token_len + 1] == ':' };
+            if (is_not_capturing) {
+                token_len += 2;
+            }
+            // group parse
+            const auto group_end_sus = find_paired_bracket<'(', ')'>(sv, 0);
+            if (!group_end_sus) {
+                return std::unexpected{ token_len };    // missmatched open bracket
+            }
+            const auto group_len = *group_end_sus - token_len;
+            auto group_sus = parse_regex(sv.substr(token_len, group_len));
+            if (!group_sus) {
+                return std::unexpected{ group_sus.error() };
+            }
+            auto&& group = std::move(*group_sus);
+            token_len += group_len + 1;    // skip ')'
+            return { { Group{ std::make_unique<Regex>(std::move(group)),
+                              !is_not_capturing,
+                              search_quantifier(sv.substr(token_len), &token_len).value_or(without_quantifier) },
+                       token_len } };
+        }
+        // string begin (how to handle)
+        case '^':
+            // FIXME
+            // fall to prevent warnings
+            [[fallthrough]];
+        // string end (how to handle)
+        case '$':
+            // FIXME
+            [[fallthrough]];
+        // just character (like escaped)
+        default:
+            ++token_len;
+            std::string characters;
+            characters += sv[token_len - 1];    // FIXME make it in place (std::string{ 1, `char` }) doesn't worked
+            return { { CharacterClass{
+                           characters,
+                           false,
+                           search_quantifier(sv.substr(token_len), &token_len).value_or(without_quantifier) },
+                       token_len } };
+    }
+}
+
+std::expected<details::regex::Regex, std::size_t> parse_regex(const std::string_view sv) noexcept
+{
+    using namespace details::regex;
+
+    Regex result;
     std::size_t curr{};
     while (curr < sv.size()) {
         auto res_sus = parse_token(sv.substr(curr), result);
@@ -371,6 +438,12 @@ std::expected<details::regex::Regex, std::size_t> details::regex::from_string(co
         curr += len;
     }
     return result;
+}
+}    // namespace
+
+std::expected<details::regex::Regex, std::size_t> details::regex::from_string(const std::string_view sv) noexcept
+{
+    return parse_regex(sv);
 }
 
 details::regex::ToStringResult details::regex::to_string(const Regex& reg, const yaml::GroupValues& vals) noexcept

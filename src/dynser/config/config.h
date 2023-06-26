@@ -51,7 +51,18 @@ struct Quantifier
     std::size_t from;
     std::optional<std::size_t> to;
     bool is_lazy;
+
+    constexpr inline auto operator<=>(const Quantifier&) const noexcept = default;
 } inline const without_quantifier{ 1, 1, false };
+
+using Token = std::variant<
+    struct Empty,
+    struct WildCard,
+    struct Group,
+    struct Backreference,
+    struct Lookup,
+    struct CharacterClass,
+    struct Disjunction>;
 
 struct Empty
 { };
@@ -79,18 +90,17 @@ struct Backreference
     Quantifier quantifier;
 };
 
-// maybe in other struct
 struct Lookup
 {
     std::unique_ptr<struct Regex> value;
     bool is_negative;
+    bool is_forward;    // true if forward lookup, false if backward
 
-    explicit Lookup(std::unique_ptr<struct Regex>&& value, bool is_negative) noexcept;
+    explicit Lookup(std::unique_ptr<struct Regex>&& value, bool is_negative, bool is_forward) noexcept;
     explicit Lookup(Lookup&& other) noexcept = default;
     Lookup(const Lookup& other) noexcept;
 };
 
-// how to construct
 struct CharacterClass
 {
     std::string characters;    // raw (without negation '^' symbol)
@@ -98,18 +108,15 @@ struct CharacterClass
     Quantifier quantifier;
 };
 
-// ok
 struct Disjunction
 {
-    std::unique_ptr<struct Regex> left;
-    std::unique_ptr<struct Regex> right;
+    std::unique_ptr<Token> left;
+    std::unique_ptr<Token> right;
 
-    explicit Disjunction(std::unique_ptr<struct Regex>&& left, std::unique_ptr<struct Regex>&& right) noexcept;
+    explicit Disjunction(std::unique_ptr<Token>&& left, std::unique_ptr<Token>&& right) noexcept;
     explicit Disjunction(Disjunction&& other) noexcept = default;
     Disjunction(const Disjunction& other) noexcept;
 };
-
-using Token = std::variant<Empty, WildCard, Group, Backreference, Lookup, CharacterClass, Disjunction>;
 
 struct Regex
 {
