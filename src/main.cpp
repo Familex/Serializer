@@ -262,13 +262,17 @@ int main()
         using Test = std::pair<std::string, GroupValues>;
 
         Test tests[]{
-            { "(\\d{2})", { { 1, "999" } } },
-            { "(\\d+){2}", { { 1, "10" } } },
-            { "(\\d{2})", { { 1, "99" } } },
-            { "(\\d{2})", { { 1, "099" } } },
-            { "(.+)/(.+)", { { 1, "left" }, { 2, "right" } } },
+            { "(\\d{2})", { { 1, "099" } } },     //
+            { "(\\d{4,})", { { 1, "9" } } },      //
+            { "(\\w{10})!", { { 1, "ha" } } },    //
+            { "(\\d{2})", { { 1, "999" } } },     //
+            { "(\\d+){2}", { { 1, "10" } } },     //
+            { "(\\d{2})", { { 1, "99" } } },      //
+            { "(.+)[\\\\/](.+)", { { 1, "left" }, { 2, "right" } } },
+            { "(.+)\\1{4,5}", { { 1, "go!" } } },
         };
 
+        // std::cout << *to_string(*from_string(test), vals) and error handle
         for (std::size_t num{}; const auto& [reg, vals] : tests) {
             std::cout << "test #" << num++ << ": ";
             const auto r = from_string(reg);
