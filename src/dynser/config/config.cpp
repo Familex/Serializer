@@ -321,8 +321,8 @@ std::expected<std::pair<details::regex::Token, std::size_t>, std::size_t> parse_
             // search closing bracket (be aware of escaped variant)
             std::size_t character_class_begin{ token_len + is_negated };
             std::size_t character_class_end{ token_len + 1 };
-            while (sv.size() < character_class_end && sv[character_class_end] != ']' ||
-                   sv[character_class_end - 1] == '\\')
+            while (character_class_end < sv.size() &&
+                   !(sv[character_class_end] == ']' && sv[character_class_end - 1] != '\\'))
             {
                 ++character_class_end;
             }
@@ -638,7 +638,7 @@ details::regex::ToStringResult resolve_token(
                 }
                 // One unescaped symbol, no exceptions, just return it
                 if (value.characters[0] != '\\') {
-                    return apply_quantifier(value.characters, value.quantifier);
+                    return apply_quantifier(value.characters.substr(0, 1), value.quantifier);
                 }
                 if (value.characters.size() == 1) {
                     return std::unexpected{ ToStringError{
