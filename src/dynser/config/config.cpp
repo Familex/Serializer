@@ -278,11 +278,12 @@ std::expected<std::pair<details::regex::Token, std::size_t>, std::size_t> parse_
 {
     using namespace details::regex;
 
+    std::size_t token_len{};
+
     if (sv.empty()) {
-        return std::unexpected{ 0 };
+        return std::unexpected{ token_len };
     }
 
-    std::size_t token_len{};
     switch (sv[0]) {
         // fullstop symbol
         case '.':
@@ -312,13 +313,22 @@ std::expected<std::pair<details::regex::Token, std::size_t>, std::size_t> parse_
         case '[':
         {
             ++token_len;
+            if (sv.size() <= token_len) {
+                // ']' can't be here, what is syntax error
+                return std::unexpected{ token_len };
+            }
             const auto is_negated = sv[token_len] == '^';
             // search closing bracket (be aware of escaped variant)
             std::size_t character_class_begin{ token_len + is_negated };
             std::size_t character_class_end{ token_len + 1 };
-            // FIXME sv end handle (sv without ']')
-            while (sv[character_class_end] != ']' || sv[character_class_end - 1] == '\\') {
+            while (sv.size() < character_class_end && sv[character_class_end] != ']' ||
+                   sv[character_class_end - 1] == '\\')
+            {
                 ++character_class_end;
+            }
+            if (character_class_end == sv.size()) {
+                // ']' not found
+                return std::unexpected{ character_class_end };
             }
             --character_class_end;                  // skip ']'
             token_len = character_class_end + 2;    // skip ']'
