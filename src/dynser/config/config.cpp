@@ -240,25 +240,50 @@ search_quantifier(const std::string_view sv, std::size_t* out /* = nullptr */) n
 
 /**
  * \brief Return index of paired bracket of sv[resp_pos] else std::nullopt.
- * \tparam open_bracket open bracket char.
- * \tparam close_bracket close bracket char.
  */
-template <char open_bracket, char close_bracket>
-constexpr std::optional<std::size_t> find_paired_bracket(const std::string_view sv, const std::size_t resp_pos) noexcept
+constexpr std::optional<std::size_t>
+find_paired_round_bracket(const std::string_view sv, const std::size_t resp_pos) noexcept
 {
+    constexpr auto open_bracket = '(';
+    constexpr auto close_bracket = ')';
+    constexpr auto open_character_class = '[';
+    constexpr auto close_character_class = ']';
+
     if (sv[resp_pos] != open_bracket) {
         return std::nullopt;
     }
+
+    // ([)](\w)){2}
+
+    bool is_character_class{ false };
+    int is_escaped{ 0 };    // works like timer
     std::size_t open_brackets = 1;
     for (std::size_t i = resp_pos + 1; i < sv.size(); ++i) {
-        if (sv[i] == open_bracket) {
-            ++open_brackets;
+        if (is_escaped > 0) {
+            --is_escaped;
         }
-        else if (sv[i] == close_bracket) {
-            --open_brackets;
+        if (sv[i] == '\\') {
+            is_escaped = 2;
+        }
+        else if (!is_character_class && !is_escaped) {
+            // groups
+            switch (sv[i]) {
+                case open_bracket:
+                    ++open_brackets;
+                    break;
+                case close_bracket:
+                    --open_brackets;
+                    break;
+                case open_character_class:
+                    is_character_class = true;
+                    break;
+            }
             if (open_brackets == 0) {
                 return i;
             }
+        }
+        else if (sv[i] == close_character_class) {
+            is_character_class = false;
         }
     }
     return std::nullopt;
@@ -387,7 +412,7 @@ std::expected<std::pair<details::regex::Token, std::size_t>, std::size_t> parse_
                 token_len += is_lookahead ? 2 : 3;
 
                 // group parse
-                const auto group_end_sus = find_paired_bracket<'(', ')'>(sv, 0);
+                const auto group_end_sus = find_paired_round_bracket(sv, 0);
                 if (!group_end_sus) {
                     return std::unexpected{ token_len };    // missmatched open bracket
                 }
@@ -407,7 +432,7 @@ std::expected<std::pair<details::regex::Token, std::size_t>, std::size_t> parse_
             }
             // group parse
             const auto group_start = token_len;
-            const auto group_end_sus = find_paired_bracket<'(', ')'>(sv, 0);
+            const auto group_end_sus = find_paired_round_bracket(sv, 0);
             if (!group_end_sus) {
                 return std::unexpected{ token_len };    // missmatched open bracket
             }
@@ -596,7 +621,13 @@ details::regex::ToStringResult resolve_token(
             [&](const Empty& value) -> ToStringResult { return ""; },
             [&](const WildCard& value) -> ToStringResult { return apply_quantifier(".", value.quantifier); },
             [&](const Group& value) -> ToStringResult {
-                // is_capturing is unused?
+                if (!value.is_capturing) {
+                    const auto result_sus = resolve_regex(*value.value, vals, cached_group_values);
+                    if (!result_sus) {
+                        return std::unexpected{ result_sus.error() };
+                    }
+                    return apply_quantifier(*result_sus, value.quantifier);
+                }
                 if (!vals.contains(value.number)) {
                     return std::unexpected{ ToStringError{ ToStringErrorType::MissingValue, value.number } };
                 }
