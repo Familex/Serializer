@@ -12,6 +12,10 @@ add_library (
     "structs/context.hpp"
     "util/prefix.hpp"
     "config/config.h" "config/config.cpp"
+    "config/regex/structures.h" "config/regex/structures.cpp"
+    "config/regex/to_string.h" "config/regex/to_string.cpp"
+    "config/regex/from_string.h" "config/regex/from_string.cpp"
+    "config/structures.h"
 )
 
 set_property (TARGET dynser PROPERTY CXX_STANDARD 23)
