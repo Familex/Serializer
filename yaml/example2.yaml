@@ -1,71 +1,71 @@
 ---
 # yaml-language-server: $schema=./schema_2.json
-version: 'example2'
+version: "example2"
 tags:
-- name: 'foo'
-  nested:
-  - 'existing': 'bar'
-  - 'linear':
-    pattern: (\\d+)\.
-    fields:
-      1: dot-stopped
-  - 'linear':
-    pattern: \\d{$1}
-    dyn-groups:
-      1: val-length
-    fields:
-      0: len-stopped
-  serialization-script: |
-    out['dot-stopped'] = tostring(inp['dot-stopped'])
-    out['len-stopped'] = tostring(inp['len-stopped'])
-  deserialization-script: |
-    out['dot-stopped'] = tonumber(inp['dot-stopped'])
-    out['len-stopped'] = tonumber(inp['len-stopped'])
-- name: 'bar'
-  nested:
-  - 'branched':
-    type: match-successfulness
-    patterns:
-      - left
-      - right
-    fields:
-      0: left-right
-  serialization-script: |
-    out['left-right'] = inp['is-left'] ? 'left' : 'right'
-  deserialization-script: |
-    out['is-left'] = inp['left-right'] == 'left'
-- name: 'baz'
-  nested:
-  - 'branched':
-    type: script-variable
-    variable: type # variable is a string
-    script: |
-      type = ctx['type']
-    patterns:
-      a: a*
-      b: b*
-    fields:
-      0: letter
-  serialization-script: |
-    out['letter'] = inp['letter']
-  deserialization-script: |
-    out['letter'] = inp['letter']
-- name: 'pos'
-  nested:
-  - 'linear':
-    pattern: \\d\\d
-    fields:
-      0: value
-  serialization-script: |
-    out['value'] = tostring(inp['value'])
-  deserialization-script: |
-    out['value'] = tonumber(inp['value'])
-- name: 'input'
-  nested:
-  - 'existing':
-    tag: 'pos'
-    prefix: from
-  - 'existing':
-    tag: 'pos'
-    prefix: to
+  - name: "foo"
+    nested:
+      - existing: { tag: "bar" }
+      - linear:
+          pattern: (\\d+)\.
+          fields:
+            1: dot-stopped
+      - linear:
+          pattern: \\d{$1}
+          dyn-groups:
+            1: val-length
+          fields:
+            0: len-stopped
+    serialization-script: |
+      out['dot-stopped'] = tostring(inp['dot-stopped'])
+      out['len-stopped'] = tostring(inp['len-stopped'])
+    deserialization-script: |
+      out['dot-stopped'] = tonumber(inp['dot-stopped'])
+      out['len-stopped'] = tonumber(inp['len-stopped'])
+  - name: "bar"
+    nested:
+      - branched:
+          type: match-successfulness
+          patterns:
+            - left
+            - right
+          fields:
+            0: left-right
+    serialization-script: |
+      out['left-right'] = inp['is-left'] ? 'left' : 'right'
+    deserialization-script: |
+      out['is-left'] = inp['left-right'] == 'left'
+  - name: "baz"
+    nested:
+      - branched:
+          type: script-variable
+          variable: type
+          script: |
+            type = ctx['type']
+          patterns:
+            a: a*
+            b: b*
+          fields:
+            0: letter
+    serialization-script: |
+      out['letter'] = inp['letter']
+    deserialization-script: |
+      out['letter'] = inp['letter']
+  - name: "pos"
+    nested:
+      - linear:
+          pattern: \\d\\d
+          fields:
+            0: value
+    serialization-script: |
+      out['value'] = tostring(inp['value'])
+    deserialization-script: |
+      out['value'] = tonumber(inp['value'])
+  - name: "input"
+    nested:
+      - existing: # existing tag several times
+          tag: "pos"
+          prefix: from
+      - existing:
+          tag: "pos"
+          prefix: to
 ...
