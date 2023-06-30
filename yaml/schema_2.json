@@ -2,6 +2,10 @@
   "$schema": "http://json-schema.org/draft-07/schema",
   "$id": "0.2",
   "type": "object",
+  "required": [
+    "version",
+    "tags"
+  ],
   "description": "YAML schema for this DynSer config files",
   "properties": {
     "version": {
@@ -13,6 +17,10 @@
       "description": "description of tags",
       "items": {
         "type": "object",
+        "required": [
+          "name",
+          "nested"
+        ],
         "description": "tag what can be use to serialize fields",
         "properties": {
           "name": {
@@ -27,9 +35,15 @@
             "items": {
               "type": "object",
               "description": "field type",
+              "propertyNames": {
+                "pattern": "existing|linear|branched|recurrent"
+              },
               "patternProperties": {
                 "existing": {
                   "type": "object",
+                  "required": [
+                    "tag"
+                  ],
                   "description": "existing field rule",
                   "properties": {
                     "tag": {
@@ -44,6 +58,9 @@
                 },
                 "linear": {
                   "type": "object",
+                  "required": [
+                    "pattern"
+                  ],
                   "description": "define one-pattern unnamed rule",
                   "properties": {
                     "pattern": {
@@ -53,6 +70,9 @@
                     "fields": {
                       "type": "object",
                       "description": "fields to [de]serialize",
+                      "propertyNames": {
+                        "pattern": "\\d+"
+                      },
                       "patternProperties": {
                         "\\d+": {
                           "type": "string",
@@ -63,6 +83,9 @@
                     "dyn-groups": {
                       "type": "object",
                       "description": "groups what resolves in runtime",
+                      "propertyNames": {
+                        "pattern": "\\d+"
+                      },
                       "patternProperties": {
                         "\\d+": {
                           "type": "string",
@@ -74,6 +97,10 @@
                 },
                 "branched": {
                   "type": "object",
+                  "required": [
+                    "type",
+                    "patterns"
+                  ],
                   "description": "define unnamed rule with several variants",
                   "properties": {
                     "type": {
@@ -89,7 +116,7 @@
                       "type": "string",
                       "description": "[script-variable] lua script to resolve variable value"
                     },
-                    "pattern": {
+                    "patterns": {
                       "oneOf": [
                         {
                           "type": "array",
@@ -102,9 +129,14 @@
                         {
                           "type": "object",
                           "description": "[script-variable] map from variable values to patterns",
-                          "items": {
-                            "type": "string",
-                            "description": "pattern to match"
+                          "propertyNames": {
+                            "pattern": "^.+$"
+                          },
+                          "patternProperties": {
+                            "^.+$": {
+                              "type": "string",
+                              "description": "pattern"
+                            }
                           }
                         }
                       ]
@@ -112,6 +144,9 @@
                     "fields": {
                       "type": "object",
                       "description": "fields to [de]serialize",
+                      "propertyNames": {
+                        "pattern": "\\d+"
+                      },
                       "patternProperties": {
                         "\\d+": {
                           "type": "string",
@@ -122,6 +157,9 @@
                     "dyn-groups": {
                       "type": "object",
                       "description": "groups what resolves in runtime",
+                      "propertyNames": {
+                        "pattern": "\\d+"
+                      },
                       "patternProperties": {
                         "\\d+": {
                           "type": "string",
@@ -132,8 +170,11 @@
                   }
                 },
                 "recurrent": {
-                  "type": "object",
                   "$comment": "use to handle lists",
+                  "type": "object",
+                  "required": [
+                    "pattern"
+                  ],
                   "description": "define repeating pattern unnamed rule",
                   "properties": {
                     "pattern": {
@@ -143,6 +184,9 @@
                     "fields": {
                       "type": "object",
                       "description": "fields to [de]serialize",
+                      "propertyNames": {
+                        "pattern": "\\d+"
+                      },
                       "patternProperties": {
                         "\\d+": {
                           "type": "string",
@@ -153,6 +197,9 @@
                     "dyn-groups": {
                       "type": "object",
                       "description": "groups what resolves in runtime",
+                      "propertyNames": {
+                        "pattern": "\\d+"
+                      },
                       "patternProperties": {
                         "\\d+": {
                           "type": "string",
