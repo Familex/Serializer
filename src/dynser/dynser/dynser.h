@@ -46,21 +46,29 @@ public:
     const TargetToPropertyMapper ttpm;
     Context context;
 
-    DynSer(PropertyToTargetMapper&& pttm, TargetToPropertyMapper&& ttpm, config::FileName wrapper) noexcept
+    DynSer(PropertyToTargetMapper&& pttm, TargetToPropertyMapper&& ttpm, const config::FileName& wrapper) noexcept
       : pttm{ std::move(pttm) }
       , ttpm{ std::move(ttpm) }
     {
-        std::ifstream file{ wrapper.config_file_name };
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-        config_ = config::Config{ buffer.str() };
+        load_config(wrapper);
     }
 
-    DynSer(PropertyToTargetMapper&& pttm, TargetToPropertyMapper&& ttpm, config::RawContents wrapper) noexcept
+    DynSer(PropertyToTargetMapper&& pttm, TargetToPropertyMapper&& ttpm, const config::RawContents& wrapper) noexcept
       : pttm{ std::move(pttm) }
       , ttpm{ std::move(ttpm) }
       , config_{ wrapper.config }
     { }
+
+    void load_config(const config::RawContents& wrapper) noexcept { config_ = wrapper.config; }
+
+    void load_config(const config::FileName& wrapper) noexcept
+    {
+        std::ifstream file{ wrapper.config_file_name };
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        // FIXME throw handling
+        config_ = config::from_string(buffer.str());
+    }
 
     template <typename Target>
     std::string serialize(const Target& target, const std::string_view tag) noexcept

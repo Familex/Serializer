@@ -16,14 +16,10 @@ regex::ToStringResult resolve_regex(yaml::Regex&& reg, yaml::GroupValues&& vals)
 
 }    // namespace details
 
-struct Config
-{
-    explicit Config() noexcept { }
-
-    Config(std::string_view config) noexcept
-    {
-        // TODO some config parse etc.
-    }
-};
+/**
+ * \brief parse string and return config struct.
+ * \throw if string is not valid yaml (see scheme).
+ */
+Config from_string(const std::string_view sv);
 
 }    // namespace dynser::config

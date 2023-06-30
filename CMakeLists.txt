@@ -9,22 +9,6 @@ endif ()
 project (main)
 
 #######################################
-# External projects
-#######################################
-
-include (src/download_project/DownloadProject.cmake)
-
-# yaml-cpp
-download_project (
-    PROJ yaml_cpp 
-    GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
-    GIT_TAG master
-    UPDATE_DISCONNECTED 1
-)
-add_subdirectory (${yaml_cpp_SOURCE_DIR} ${yaml_cpp_BINARY_DIR})
-include_directories ("${yaml_cpp_SOURCE_DIR}/include")
-
-#######################################
 # Source
 #######################################
 
@@ -47,7 +31,7 @@ target_include_directories (
 set_property (TARGET main PROPERTY CXX_STANDARD 23)
 
 # yaml configs
-file(
+file (
     COPY "${CMAKE_CURRENT_SOURCE_DIR}/yaml"
     DESTINATION "${CMAKE_CURRENT_BINARY_DIR}"
 )
@@ -68,7 +52,5 @@ target_compile_options (
 target_link_libraries (
     main
     dynser
-    # downloaded libs
-    yaml-cpp
 )
 

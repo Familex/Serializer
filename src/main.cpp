@@ -128,13 +128,13 @@ int main()
 
         const auto dyn_regex = yaml::DynRegex{ R"(\_2\[\d{\_1},\d{\_1}\])" };
         const auto without_prefix = resolve_dyn_regex(clone(dyn_regex), yaml::DynGroupValues{ { 1, "4" } });
-        const auto res0 = std::regex_match("[0010,1999]", std::regex{ without_prefix.value });
+        const auto res0 = std::regex_match("[0010,1999]", std::regex{ without_prefix });
 
         const auto with_prefix =
             resolve_dyn_regex(clone(dyn_regex), yaml::DynGroupValues{ { 1, "2" }, { 2, "pos: " } });
-        const auto res1 = std::regex_match("pos: [04,12]", std::regex{ with_prefix.value });
-        const auto res2 = std::regex_match("pos:[04,12]", std::regex{ with_prefix.value });
-        const auto res3 = std::regex_match("pos: [4,12]", std::regex{ with_prefix.value });
+        const auto res1 = std::regex_match("pos: [04,12]", std::regex{ with_prefix });
+        const auto res2 = std::regex_match("pos:[04,12]", std::regex{ with_prefix });
+        const auto res3 = std::regex_match("pos: [4,12]", std::regex{ with_prefix });
 
         assert(res0 && res1 && !res2 && !res3);
     }
@@ -256,7 +256,7 @@ int main()
         }
     }
 
-    if constexpr (true) {
+    if constexpr (false) {
         using namespace dynser::config::details::regex;
         using dynser::config::details::yaml::GroupValues;
         using Test = std::pair<std::string, GroupValues>;
@@ -297,5 +297,13 @@ int main()
             }
             std::cout << "result '" << *t << "'\n";
         }
+    }
+
+    if constexpr (true) {
+        using namespace dynser::config;
+
+        dynser::DynSer config_parse_test{ dynser::PropertyToTargetMapper{},
+                                          dynser::TargetToPropertyMapper{},
+                                          FileName{ "yaml/example2.yaml" } };
     }
 }

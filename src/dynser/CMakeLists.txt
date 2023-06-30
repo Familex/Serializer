@@ -51,6 +51,16 @@ download_project (
 )
 include_directories ("${luwra_SOURCE_DIR}/lib")
 
+# yaml-cpp
+download_project (
+    PROJ yaml_cpp
+    GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+    GIT_TAG master
+    UPDATE_DISCONNECTED 1
+)
+add_subdirectory (${yaml_cpp_SOURCE_DIR} ${yaml_cpp_BINARY_DIR})
+include_directories ("${yaml_cpp_SOURCE_DIR}/include")
+
 #######################################
 # Link
 #######################################
@@ -58,6 +68,7 @@ include_directories ("${luwra_SOURCE_DIR}/lib")
 target_link_libraries (
     dynser
     lua_static
+    yaml-cpp
 )
 
 #######################################
