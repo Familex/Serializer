@@ -208,31 +208,3 @@ public:
 };
 
 }    // namespace dynser
-
-/* trash bin (remove before push)
-// WRONG (must be recursive)
-if (std::holds_alternative<Existing>(existing_sus)) {
-    const auto& existing = std::get<Existing>(existing_sus);
-    const auto& existing_tag_script = config_->tags.at(existing.tag).serialization_script;
-    luwra::StateWrapper state_inner;
-    state_inner.loadStandardLibrary();
-    register_userdata_property_value(state_inner);
-
-    // nullopt prefix handle
-    const auto inp = util::remove_prefix(props, *existing.prefix);
-    const auto serialize_result = serialize_props(inp, existing.tag);
-    state_inner["inp"] = inp;
-    state_inner["out"] = Fields{};
-
-    const auto script_run_result = state_inner.runString(existing_tag_script->c_str());
-    if (script_run_result != LUA_OK) {
-        const auto error = state_inner.read<std::string>(-1);
-        return std::nullopt;
-    }
-    // FIXME some merge method?
-    const auto add = util::add_prefix(state_inner["out"].read<Fields>(), *existing.prefix);
-    for (const auto& [key, val] : add) {
-        state["out"][key] = val;
-    }
-}
-*/
