@@ -9,7 +9,10 @@
 #include <regex>
 
 // debug print
+#ifdef _DEBUG
+#include <format>
 #include <iostream>
+#endif
 
 using namespace dynser::config;
 
@@ -99,18 +102,18 @@ inline std::optional<Res> as_opt(YAML::Node const& node) noexcept
 
 }    // namespace
 
-Config dynser::config::from_string(const std::string_view sv)
+std::optional<Config> dynser::config::from_string(const std::string_view sv) noexcept
 {
+    try {
+        const auto yaml = YAML::Load(std::string{ sv });
+        Config result;
 
-    const auto yaml = YAML::Load(std::string{ sv });
-    Config result;
+        result.version = yaml["version"].as<std::string>();
 
-    result.version = yaml["version"].as<std::string>();
+        for (const auto tag : yaml["tags"]) {
+            const auto tag_name = tag["name"].as<std::string>();
 
-    for (const auto tag : yaml["tags"]) {
-        const auto tag_name = tag["name"].as<std::string>();
-
-        // clang-format off
+            // clang-format off
         result.tags[tag_name] = {
             .name = tag_name,
             .nested = [&]{
@@ -165,8 +168,16 @@ Config dynser::config::from_string(const std::string_view sv)
             .serialization_script = as_opt<details::yaml::Script>(tag["serialization-script"]),
             .deserialization_script = as_opt<details::yaml::Script>(tag["deserialization-script"])
         };
-        // clang-format on
-    }
+            // clang-format on
+        }
 
-    return result;
+        return result;
+    }
+    catch ([[maybe_unused]] std::exception& e) {
+// debug print FIXME proper error handling
+#ifdef _DEBUG
+        std::cerr << std::format("{} error: {}", __FUNCTION__, e.what()) << std::endl;
+#endif
+    }
+    return std::nullopt;
 }

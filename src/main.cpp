@@ -108,8 +108,8 @@ int main()
                            dynser::util::add_prefix(pos_to_prop(ctx, target.to), "to");
                 },
             },
-            dynser::config::FileName{ "./yaml/example2.yaml" }
         };
+        const auto load_result = ser.load_config(dynser::config::FileName{ "./yaml/example2.yaml" });
 
         const auto round_trip = [&ser](const auto& target, const std::string_view tag) noexcept {
             using T = std::remove_cvref_t<decltype(target)>;
@@ -302,8 +302,8 @@ int main()
     if constexpr (true) {
         using namespace dynser::config;
 
-        dynser::DynSer config_parse_test{ dynser::PropertyToTargetMapper{},
-                                          dynser::TargetToPropertyMapper{},
-                                          FileName{ "yaml/example2.yaml" } };
+        dynser::DynSer config_parse_test{ dynser::PropertyToTargetMapper{}, dynser::TargetToPropertyMapper{} };
+        const auto parse_result = config_parse_test.load_config(FileName{ "yaml/example2.yaml" });
+        std::cout << std::boolalpha << parse_result << std::endl;
     }
 }

@@ -30,10 +30,14 @@ target_include_directories (
 
 set_property (TARGET main PROPERTY CXX_STANDARD 23)
 
-# yaml configs
-file (
-    COPY "${CMAKE_CURRENT_SOURCE_DIR}/yaml"
-    DESTINATION "${CMAKE_CURRENT_BINARY_DIR}"
+# move yaml configs to binary dir
+# FIXME copy directory instead of symlinking would be better?
+add_custom_command (
+    TARGET main
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+        "${CMAKE_SOURCE_DIR}/yaml/"
+        "$<TARGET_FILE_DIR:main>/yaml/"
 )
 
 # compile warnings

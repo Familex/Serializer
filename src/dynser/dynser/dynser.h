@@ -39,35 +39,39 @@ TargetToPropertyMapper(Fs...) -> TargetToPropertyMapper<Fs...>;
 template <typename PropertyToTargetMapper, typename TargetToPropertyMapper>
 class DynSer
 {
-    config::Config config_;
+    std::optional<config::Config> config_{};
+
+    std::optional<config::Config> from_file(const config::RawContents& wrapper) noexcept
+    {
+        return config::from_string(wrapper.config);
+    }
+
+    std::optional<config::Config> from_file(const config::FileName& wrapper) noexcept
+    {
+        std::ifstream file{ wrapper.config_file_name };
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        return from_file(config::RawContents(buffer.str()));
+    }
 
 public:
     const PropertyToTargetMapper pttm;
     const TargetToPropertyMapper ttpm;
     Context context;
 
-    DynSer(PropertyToTargetMapper&& pttm, TargetToPropertyMapper&& ttpm, const config::FileName& wrapper) noexcept
+    DynSer(PropertyToTargetMapper&& pttm, TargetToPropertyMapper&& ttpm) noexcept
       : pttm{ std::move(pttm) }
       , ttpm{ std::move(ttpm) }
-    {
-        load_config(wrapper);
-    }
-
-    DynSer(PropertyToTargetMapper&& pttm, TargetToPropertyMapper&& ttpm, const config::RawContents& wrapper) noexcept
-      : pttm{ std::move(pttm) }
-      , ttpm{ std::move(ttpm) }
-      , config_{ wrapper.config }
     { }
 
-    void load_config(const config::RawContents& wrapper) noexcept { config_ = wrapper.config; }
-
-    void load_config(const config::FileName& wrapper) noexcept
+    template <typename ConfigFile>
+    bool load_config(ConfigFile&& wrapper) noexcept
     {
-        std::ifstream file{ wrapper.config_file_name };
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-        // FIXME throw handling
-        config_ = config::from_string(buffer.str());
+        if (const auto config = from_file(std::forward<ConfigFile>(wrapper))) {
+            config_ = *config;
+            return true;
+        }
+        return false;
     }
 
     template <typename Target>
