@@ -10,9 +10,9 @@ namespace dynser::config
 namespace details
 {
 
-yaml::Regex resolve_dyn_regex(yaml::DynRegex&& dyn_reg, yaml::DynGroupValues&& dyn_gr_vals) noexcept;
+yaml::Regex resolve_dyn_regex(const yaml::DynRegex& dyn_reg, const yaml::DynGroupValues& dyn_gr_vals) noexcept;
 
-regex::ToStringResult resolve_regex(yaml::Regex&& reg, yaml::GroupValues&& vals) noexcept;
+regex::ToStringResult resolve_regex(const yaml::Regex& reg, const yaml::GroupValues& vals) noexcept;
 
 }    // namespace details
 

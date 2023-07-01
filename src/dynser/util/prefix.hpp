@@ -6,22 +6,29 @@
 
 namespace dynser::util
 {
-
-Properties add_prefix(Properties&& props, std::string_view prefix) noexcept
+template <typename Map>
+Map add_prefix(const Map& map, const std::string_view prefix) noexcept
 {
-    Properties result;
-    for (auto& [key, value] : props) {
-        result[prefix.data() + ('-' + key)] = std::move(value);
+    constexpr auto infix{ "-" };
+    Map result{};
+    for (auto& [key, value] : map) {
+        result[prefix.data() + (infix + key)] = value;
     }
     return result;
 }
 
-Properties remove_prefix(Properties& props, std::string_view prefix) noexcept
+/**
+ * brief filders keys what starts with prefix and remove this prefix from it.
+ */
+template <typename Map>
+Map remove_prefix(const Map& props, const std::string_view prefix) noexcept
 {
-    Properties result;
+    constexpr auto infix_size = std::string{ "-" }.size();
+
+    Map result{};
     for (auto& [key, value] : props) {
         if (key.starts_with(prefix)) {
-            result.insert({ key.substr(prefix.size()), value });
+            result.insert({ key.substr(prefix.size() + infix_size), value });
         }
     }
     return result;

@@ -6,18 +6,18 @@ tags:
     nested:
       - existing: { tag: "bar" }
       - linear:
-          pattern: (\\d+)\.
+          pattern: '(\d+)\.'
           fields:
             1: dot-stopped
       - linear:
-          pattern: \\d{$1}
+          pattern: '\d{$1}'
           dyn-groups:
             1: val-length
           fields:
             0: len-stopped
     serialization-script: |
-      out['dot-stopped'] = tostring(inp['dot-stopped'])
-      out['len-stopped'] = tostring(inp['len-stopped'])
+      out['dot-stopped'] = tostring(inp['dot-stopped']:as_i32())
+      out['len-stopped'] = tostring(inp['len-stopped']:as_i32())
     deserialization-script: |
       out['dot-stopped'] = tonumber(inp['dot-stopped'])
       out['len-stopped'] = tonumber(inp['len-stopped'])
@@ -31,7 +31,7 @@ tags:
           fields:
             0: left-right
     serialization-script: |
-      out['left-right'] = inp['is-left'] ? 'left' : 'right'
+      out['left-right'] = inp['is-left'] and 'left' or 'right'
     deserialization-script: |
       out['is-left'] = inp['left-right'] == 'left'
   - name: "baz"
@@ -47,25 +47,34 @@ tags:
           fields:
             0: letter
     serialization-script: |
-      out['letter'] = inp['letter']
+      out['letter'] = inp['letter']:as_string()
     deserialization-script: |
       out['letter'] = inp['letter']
   - name: "pos"
     nested:
       - linear:
-          pattern: \\d\\d
+          pattern: '(\d+), (\d+)'
           fields:
-            0: value
+            1: x
+            2: y
     serialization-script: |
-      out['value'] = tostring(inp['value'])
+      out['x'] = tostring(inp['x']:as_i32())
+      out['y'] = tostring(inp['y']:as_i32())
     deserialization-script: |
-      out['value'] = tonumber(inp['value'])
+      out['x'] = tonumber(inp['x'])
+      out['y'] = tonumber(inp['y'])
   - name: "input"
     nested:
+      - linear:
+          pattern: 'from: \('
       - existing: # existing tag several times
           tag: "pos"
           prefix: from
+      - linear:
+          pattern: '\) to: \('
       - existing:
           tag: "pos"
           prefix: to
+      - linear:
+          pattern: '\)'
 ...

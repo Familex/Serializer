@@ -11,6 +11,7 @@ add_library (
     "structs/properties.hpp"
     "structs/context.hpp"
     "util/prefix.hpp"
+    "util/visit.hpp"
     "config/config.h" "config/config.cpp"
     "config/regex/structures.h" "config/regex/structures.cpp"
     "config/regex/to_string.h" "config/regex/to_string.cpp"

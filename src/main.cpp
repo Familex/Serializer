@@ -16,7 +16,7 @@ struct Overload : Fs...
 
 int main()
 {
-    if constexpr (false) {
+    if constexpr (true) {
         struct Bar
         {
             bool is_left;
@@ -27,8 +27,8 @@ int main()
         struct Foo
         {
             Bar bar;
-            std::uint32_t dot;
-            std::uint32_t dyn;
+            std::int32_t dot;
+            std::int32_t dyn;
 
             auto operator<=>(const Foo&) const = default;
         } foo{ bar, 425, 1928 };
@@ -42,8 +42,8 @@ int main()
 
         struct Pos
         {
-            std::uint32_t x;
-            std::uint32_t y;
+            std::int32_t x;
+            std::int32_t y;
 
             auto operator<=>(const Pos&) const = default;
         } from{ 10, 531 }, to{ 121, 4929 };
@@ -69,7 +69,7 @@ int main()
         };
 
         const auto prop_to_pos = [](dynser::Context&, dynser::Properties&& props, Pos& out) {
-            out = { any_cast<std::uint32_t>(props["x"].data), any_cast<std::uint32_t>(props["y"].data) };
+            out = { any_cast<std::int32_t>(props["x"].data), any_cast<std::int32_t>(props["y"].data) };
         };
 
         dynser::DynSer ser{
@@ -79,8 +79,8 @@ int main()
                     Bar bar;
                     prop_to_bar(ctx, dynser::util::remove_prefix(props, "bar"), bar);
                     out = { bar,
-                            std::any_cast<std::uint32_t>(props["dot-stopped"].data),
-                            std::any_cast<std::uint32_t>(props["len-stopped"].data) };
+                            std::any_cast<std::int32_t>(props["dot-stopped"].data),
+                            std::any_cast<std::int32_t>(props["len-stopped"].data) };
                 },
                 [](dynser::Context&, dynser::Properties&& props, Baz& out) { out = { props["letter"].as_string() }; },
                 prop_to_pos,
@@ -113,14 +113,26 @@ int main()
 
         const auto round_trip = [&ser](const auto& target, const std::string_view tag) noexcept {
             using T = std::remove_cvref_t<decltype(target)>;
-            return target == ser.deserialize<T>(ser.serialize(target, tag), tag);
+            const auto serialize_result = ser.serialize(target, tag);
+            if (!serialize_result)
+                return false;
+            std::cout << std::format("serialized '{}' is '{}'", tag, *serialize_result) << std::endl;
+            const auto deserialize_result = ser.deserialize<T>(*serialize_result, tag);
+            if (!deserialize_result)
+                return false;
+            return target == *deserialize_result;
         };
 
-        ser.context["val-length"] = { 4 };
+        ser.context["val-length"] = { "4" };
         ser.context["type"] = { "a" };
 
-        const auto res = round_trip(foo, "foo") && round_trip(bar, "bar") && round_trip(baz, "baz") &&
-                         round_trip(from, "pos") && round_trip(input, "input");
+        std::size_t res{};
+        res += round_trip(from, "pos");
+        res += round_trip(input, "input");
+        res += round_trip(foo, "foo");
+        res += round_trip(bar, "bar");
+        res += round_trip(baz, "baz");
+        // assert(res == 5);
     }
 
     if constexpr (false) {
@@ -297,13 +309,5 @@ int main()
             }
             std::cout << "result '" << *t << "'\n";
         }
-    }
-
-    if constexpr (true) {
-        using namespace dynser::config;
-
-        dynser::DynSer config_parse_test{ dynser::PropertyToTargetMapper{}, dynser::TargetToPropertyMapper{} };
-        const auto parse_result = config_parse_test.load_config(FileName{ "yaml/example2.yaml" });
-        std::cout << std::boolalpha << parse_result << std::endl;
     }
 }

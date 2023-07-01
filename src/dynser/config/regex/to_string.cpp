@@ -234,6 +234,8 @@ details::regex::ToStringResult resolve_regex(
     }
     return result;
 }
+
+
 }    // namespace
 
 details::regex::ToStringResult details::regex::to_string(const Regex& reg, const yaml::GroupValues& vals) noexcept

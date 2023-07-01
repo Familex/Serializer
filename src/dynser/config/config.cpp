@@ -61,7 +61,7 @@ std::string regex_replace(const std::string& s, const std::basic_regex<CharT, Tr
 }
 }    // namespace
 
-details::yaml::Regex details::resolve_dyn_regex(yaml::DynRegex&& dyn_reg, yaml::DynGroupValues&& dyn_gr_vals) noexcept
+details::yaml::Regex details::resolve_dyn_regex(const yaml::DynRegex& dyn_reg, const yaml::DynGroupValues& dyn_gr_vals) noexcept
 {
     static const std::regex dyn_gr_pattern{ R"(\\_(\d+))" };
     return { regex_replace(dyn_reg, dyn_gr_pattern, [&dyn_gr_vals](const std::smatch& m) {
@@ -73,7 +73,7 @@ details::yaml::Regex details::resolve_dyn_regex(yaml::DynRegex&& dyn_reg, yaml::
     }) };
 }
 
-details::regex::ToStringResult details::resolve_regex(yaml::Regex&& reg, yaml::GroupValues&& vals) noexcept
+details::regex::ToStringResult details::resolve_regex(const yaml::Regex& reg, const yaml::GroupValues& vals) noexcept
 {
     using namespace details::regex;
 
@@ -84,7 +84,7 @@ details::regex::ToStringResult details::resolve_regex(yaml::Regex&& reg, yaml::G
             0    // group number
         } };
     }
-    return to_string(*reg_sus, std::move(vals));
+    return to_string(*reg_sus, vals);
 }
 
 // config::from_string helpers
@@ -170,6 +170,8 @@ std::optional<Config> dynser::config::from_string(const std::string_view sv) noe
         };
             // clang-format on
         }
+
+        // FIXME logic validation (e.g. claim prefix if several existing of one tag)
 
         return result;
     }
