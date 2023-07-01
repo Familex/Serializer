@@ -4,13 +4,13 @@ version: "example2"
 tags:
   - name: "foo"
     nested:
-      - existing: { tag: "bar" }
+      # - existing: { tag: "bar" }
       - linear:
           pattern: '(\d+)\.'
           fields:
             1: dot-stopped
       - linear:
-          pattern: '\d{$1}'
+          pattern: '\d{\_1}'
           dyn-groups:
             1: val-length
           fields:

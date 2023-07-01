@@ -114,22 +114,22 @@ int main()
         const auto round_trip = [&ser](const auto& target, const std::string_view tag) noexcept {
             using T = std::remove_cvref_t<decltype(target)>;
             const auto serialize_result = ser.serialize(target, tag);
+            std::cout << std::format("serialized '{}' is '{}'\n", tag, serialize_result ? *serialize_result : "none");
             if (!serialize_result)
                 return false;
-            std::cout << std::format("serialized '{}' is '{}'", tag, *serialize_result) << std::endl;
             const auto deserialize_result = ser.deserialize<T>(*serialize_result, tag);
             if (!deserialize_result)
                 return false;
             return target == *deserialize_result;
         };
 
-        ser.context["val-length"] = { "4" };
-        ser.context["type"] = { "a" };
+        ser.context["val-length"] = { std::make_any<std::string>("4") };
+        ser.context["type"] = { std::make_any<std::string>("a") };
 
         std::size_t res{};
+        res += round_trip(foo, "foo");
         res += round_trip(from, "pos");
         res += round_trip(input, "input");
-        res += round_trip(foo, "foo");
         res += round_trip(bar, "bar");
         res += round_trip(baz, "baz");
         // assert(res == 5);

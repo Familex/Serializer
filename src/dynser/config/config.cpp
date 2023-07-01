@@ -61,7 +61,8 @@ std::string regex_replace(const std::string& s, const std::basic_regex<CharT, Tr
 }
 }    // namespace
 
-details::yaml::Regex details::resolve_dyn_regex(const yaml::DynRegex& dyn_reg, const yaml::DynGroupValues& dyn_gr_vals) noexcept
+details::yaml::Regex
+details::resolve_dyn_regex(const yaml::DynRegex& dyn_reg, const yaml::DynGroupValues& dyn_gr_vals) noexcept
 {
     static const std::regex dyn_gr_pattern{ R"(\\_(\d+))" };
     return { regex_replace(dyn_reg, dyn_gr_pattern, [&dyn_gr_vals](const std::smatch& m) {
@@ -77,14 +78,24 @@ details::regex::ToStringResult details::resolve_regex(const yaml::Regex& reg, co
 {
     using namespace details::regex;
 
-    const auto reg_sus = from_string(reg);
+    auto reg_sus = from_string(reg);
     if (!reg_sus) {
         return std::unexpected{ ToStringError{
             ToStringErrorType::RegexSyntaxError,
             0    // group number
         } };
     }
-    return to_string(*reg_sus, vals);
+    const auto regex = !vals.contains(0)
+                           ? *reg_sus
+                           : Regex{ std::vector<Token>{ Group{ std::make_unique<Regex>(std::move(*reg_sus)),
+                                                               true,
+                                                               Quantifier{ 1, 1, false },
+                                                               std::regex{ reg.data(), reg.size() },
+#ifdef _DEBUG
+                                                               static_cast<std::string>(reg),
+#endif
+                                                               0 } } };
+    return to_string(regex, vals);
 }
 
 // config::from_string helpers
