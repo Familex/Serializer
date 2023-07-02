@@ -62,10 +62,13 @@ struct BranchedScriptVariable
 
 using Branched = std::variant<BranchedMatchSuccessfulness, BranchedScriptVariable>;
 
-struct Recurrent : Linear
-{ };
+using Continual = std::variant<Existing, Linear, Branched>;
 
-using Nested = std::variant<Existing, Linear, Branched, Recurrent>;
+struct Recurrent {
+
+};
+
+using Nested = std::variant<Continual, Recurrent>;
 
 struct Tag
 {

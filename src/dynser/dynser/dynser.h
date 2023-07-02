@@ -149,32 +149,38 @@ public:
 
             const auto serialized_nested = util::visit_one(
                 nested_v,
-                [&](const Existing& nested) -> SerializeResult {
-                    const auto inp = util::remove_prefix(props, nested.prefix ? *nested.prefix : "");
-                    const auto serialize_result = serialize_props(inp, nested.tag);
-                    if (!serialize_result) {
-                        return std::nullopt;
-                    }
-                    return *serialize_result;
+                [&](const Continual& continual) -> SerializeResult {
+                    return util::visit_one(
+                        continual,
+                        [&](const Existing& nested) -> SerializeResult {
+                            const auto inp = util::remove_prefix(props, nested.prefix ? *nested.prefix : "");
+                            const auto serialize_result = serialize_props(inp, nested.tag);
+                            if (!serialize_result) {
+                                return std::nullopt;
+                            }
+                            return *serialize_result;
+                        },
+                        [&](const Linear& nested) -> SerializeResult {
+                            const auto pattern =
+                                nested.dyn_groups
+                                    ? config::details::resolve_dyn_regex(
+                                          nested.pattern,
+                                          *details::merge_maps(*nested.dyn_groups, details::props_to_fields(context))
+                                      )
+                                    : nested.pattern;
+                            const auto regex_fields =
+                                nested.fields ? *details::merge_maps(*nested.fields, fields) : GroupValues{};
+                            const auto to_string_result = config::details::resolve_regex(pattern, regex_fields);
+                            if (!to_string_result) {
+                                return std::nullopt;
+                            }
+                            return *to_string_result;
+                        },
+                        [&](const Branched& nested) -> SerializeResult { return {}; },
+                        [&](const Recurrent& nested) -> SerializeResult { return {}; }
+                    );
                 },
-                [&](const Linear& nested) -> SerializeResult {
-                    const auto pattern =
-                        nested.dyn_groups
-                            ? config::details::resolve_dyn_regex(
-                                  nested.pattern,
-                                  *details::merge_maps(*nested.dyn_groups, details::props_to_fields(context))
-                              )
-                            : nested.pattern;
-                    const auto regex_fields =
-                        nested.fields ? *details::merge_maps(*nested.fields, fields) : GroupValues{};
-                    const auto to_string_result = config::details::resolve_regex(pattern, regex_fields);
-                    if (!to_string_result) {
-                        return std::nullopt;
-                    }
-                    return *to_string_result;
-                },
-                [&](const Branched& nested) -> SerializeResult { return {}; },
-                [&](const Recurrent& nested) -> SerializeResult { return {}; }
+                [&](const Recurrent& recurrent) -> SerializeResult { return {}; }
             );
             if (!serialized_nested) {
                 return std::nullopt;

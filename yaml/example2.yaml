@@ -3,8 +3,8 @@
 version: "example2"
 tags:
   - name: "foo"
-    nested:
-      # - existing: { tag: "bar" }
+    continual:
+      - existing: { tag: "bar" }
       - linear:
           pattern: '(\d+)\.'
           fields:
@@ -22,7 +22,7 @@ tags:
       out['dot-stopped'] = tonumber(inp['dot-stopped'])
       out['len-stopped'] = tonumber(inp['len-stopped'])
   - name: "bar"
-    nested:
+    continual:
       - branched:
           type: match-successfulness
           patterns:
@@ -35,7 +35,7 @@ tags:
     deserialization-script: |
       out['is-left'] = inp['left-right'] == 'left'
   - name: "baz"
-    nested:
+    continual:
       - branched:
           type: script-variable
           variable: type
@@ -51,7 +51,7 @@ tags:
     deserialization-script: |
       out['letter'] = inp['letter']
   - name: "pos"
-    nested:
+    continual:
       - linear:
           pattern: '(\d+), (\d+)'
           fields:
@@ -64,7 +64,7 @@ tags:
       out['x'] = tonumber(inp['x'])
       out['y'] = tonumber(inp['y'])
   - name: "input"
-    nested:
+    continual:
       - linear:
           pattern: 'from: \('
       - existing: # existing tag several times
