@@ -64,16 +64,17 @@ using Branched = std::variant<BranchedMatchSuccessfulness, BranchedScriptVariabl
 
 using Continual = std::variant<Existing, Linear, Branched>;
 
-struct Recurrent {
+using Recurrent = std::variant<Linear, Branched>; // FIXME wrong
 
-};
+using Continuals = std::vector<Continual>;
+using Recurrents = std::vector<Recurrent>;
 
-using Nested = std::variant<Continual, Recurrent>;
+using Nested = std::variant<Continuals, Recurrents>;
 
 struct Tag
 {
     std::string name;
-    std::vector<Nested> nested;
+    Nested nested;
     std::optional<Script> serialization_script;
     std::optional<Script> deserialization_script;
 };

@@ -126,49 +126,51 @@ std::optional<Config> dynser::config::from_string(const std::string_view sv) noe
 
             result.tags[tag_name] = {
                 .name = tag_name,
-                .nested =
-                    [&] {    // iife
-                        std::vector<details::yaml::Nested> result;
+                .nested = [&]() -> details::yaml::Nested {    // iife
+                    if (const auto continual = tag["continual"]) {
+                        std::vector<details::yaml::Continual> result;
 
-                        if (const auto continual = tag["continual"]) {
-                            for (const auto continual_type : continual) {
-                                if (const auto nested = continual_type["existing"]) {
-                                    result.push_back(details::yaml::Existing{
-                                        .tag = nested["tag"].as<std::string>(),
-                                        .prefix = as_opt<std::string>(nested["prefix"]) });
-                                }
-                                else if (const auto nested = continual_type["linear"]) {
-                                    result.push_back(details::yaml::Linear{
-                                        .pattern = nested["pattern"].as<std::string>(),
-                                        .dyn_groups = as_opt<details::yaml::DynGroupValues>(nested["dyn-groups"]),
-                                        .fields = as_opt<details::yaml::GroupValues>(nested["fields"]) });
-                                }
-                                else if (const auto nested = continual_type["branched"]) {
-                                    const auto type{ nested["type"].as<std::string>() };
-                                    if (type == "match-successfulness") {
-                                        result.push_back(details::yaml::Branched{
-                                            details::yaml::BranchedMatchSuccessfulness{
-                                                .patterns = nested["patterns"].as<std::vector<details::yaml::Regex>>(),
-                                                .fields = as_opt<details::yaml::GroupValues>(nested["fields"]) } });
-                                    }
-                                    else if (type == "script-variable") {
-                                        result.push_back(details::yaml::Branched{ details::yaml::BranchedScriptVariable{
-                                            .variable = nested["variable"].as<std::string>(),
-                                            .script = nested["script"].as<std::string>(),
-                                            .patterns =
-                                                nested["patterns"].as<details::yaml::BranchedScriptVariable::Patterns>(
-                                                ),
+                        for (const auto continual_type : continual) {
+                            if (const auto nested = continual_type["existing"]) {
+                                result.push_back(details::yaml::Existing{ .tag = nested["tag"].as<std::string>(),
+                                                                          .prefix =
+                                                                              as_opt<std::string>(nested["prefix"]) });
+                            }
+                            else if (const auto nested = continual_type["linear"]) {
+                                result.push_back(details::yaml::Linear{
+                                    .pattern = nested["pattern"].as<std::string>(),
+                                    .dyn_groups = as_opt<details::yaml::DynGroupValues>(nested["dyn-groups"]),
+                                    .fields = as_opt<details::yaml::GroupValues>(nested["fields"]) });
+                            }
+                            else if (const auto nested = continual_type["branched"]) {
+                                const auto type{ nested["type"].as<std::string>() };
+                                if (type == "match-successfulness") {
+                                    result.push_back(details::yaml::Branched{
+                                        details::yaml::BranchedMatchSuccessfulness{
+                                            .patterns = nested["patterns"].as<std::vector<details::yaml::Regex>>(),
                                             .fields = as_opt<details::yaml::GroupValues>(nested["fields"]) } });
-                                    }
+                                }
+                                else if (type == "script-variable") {
+                                    result.push_back(details::yaml::Branched{ details::yaml::BranchedScriptVariable{
+                                        .variable = nested["variable"].as<std::string>(),
+                                        .script = nested["script"].as<std::string>(),
+                                        .patterns =
+                                            nested["patterns"].as<details::yaml::BranchedScriptVariable::Patterns>(),
+                                        .fields = as_opt<details::yaml::GroupValues>(nested["fields"]) } });
                                 }
                             }
                         }
-                        else if (const auto recurrent = tag["recurrent"]) {
-                            result.push_back(details::yaml::Recurrent{});
-                        }
 
                         return result;
-                    }(),
+                    }
+                    else if (const auto recurrent = tag["recurrent"]) {
+                        std::vector<details::yaml::Recurrent> result;
+
+                        result.push_back(details::yaml::Recurrent{});
+
+                        return result;
+                    }
+                }(),
                 .serialization_script = as_opt<details::yaml::Script>(tag["serialization-script"]),
                 .deserialization_script = as_opt<details::yaml::Script>(tag["deserialization-script"])
             };

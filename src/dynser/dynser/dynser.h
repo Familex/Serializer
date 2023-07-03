@@ -143,14 +143,14 @@ public:
         const auto fields = state["out"].read<dynser::Fields>();
 
         // nested
-        std::string result;
-        for (const auto& nested_v : tag_config.nested) {
-            using namespace config::details::yaml;
+        return util::visit_one(
+            tag_config.nested,
+            [&](const config::details::yaml::Continuals& continuals) -> SerializeResult {
+                using namespace config::details::yaml;
+                std::string result;
 
-            const auto serialized_nested = util::visit_one(
-                nested_v,
-                [&](const Continual& continual) -> SerializeResult {
-                    return util::visit_one(
+                for (const auto& continual : continuals) {
+                    const auto serialized_continual = util::visit_one(
                         continual,
                         [&](const Existing& nested) -> SerializeResult {
                             const auto inp = util::remove_prefix(props, nested.prefix ? *nested.prefix : "");
@@ -179,16 +179,30 @@ public:
                         [&](const Branched& nested) -> SerializeResult { return {}; },
                         [&](const Recurrent& nested) -> SerializeResult { return {}; }
                     );
-                },
-                [&](const Recurrent& recurrent) -> SerializeResult { return {}; }
-            );
-            if (!serialized_nested) {
-                return std::nullopt;
-            }
-            result += *serialized_nested;
-        }
+                    if (!serialized_continual) {
+                        return serialized_continual;
+                    }
+                    result += *serialized_continual;
+                }
 
-        return result;
+                return result;
+            },
+            [&](const config::details::yaml::Recurrents& recurrents) -> SerializeResult {
+                using namespace config::details::yaml;
+                std::string result;
+
+                for (const auto& recurrent : recurrents) {
+                    const auto serialized_recurrent =
+                        util::visit_one(recurrent, [&](const auto& dymmy) -> SerializeResult { return {}; });
+                    if (!serialized_recurrent) {
+                        return serialized_recurrent;
+                    }
+                    result += *serialized_recurrent;
+                }
+
+                return result;
+            }
+        );
     }
 
     template <typename Target>
