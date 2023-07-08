@@ -21,35 +21,43 @@ tags:
     deserialization-script: |
       out['dot-stopped'] = tonumber(inp['dot-stopped'])
       out['len-stopped'] = tonumber(inp['len-stopped'])
+
   - name: "bar"
-    continual:
-      - branched:
-          type: match-successfulness
-          patterns:
-            - left
-            - right
-          fields:
-            0: left-right
-    serialization-script: |
-      out['left-right'] = inp['is-left'] and 'left' or 'right'
-    deserialization-script: |
-      out['is-left'] = inp['left-right'] == 'left'
+    branched:
+      branching-script: |
+         branch = inp['is-right'] + 0
+      debranching-script: |
+         out['is-right'] = branch == true
+      rules:
+        - linear: { pattern: 'left' }
+        - linear: { pattern: 'right' }
+
   - name: "baz"
+    branched:
+      branching-script: |
+        branch = { a = 0, b = 1 }[inp['type']:as_string()]
+      debranching-script: |
+        out['type'] = { 0 = 'a', 1 = 'b' }[branch]
+      rules:
+        # TODO inline (anonymous) tags
+        - existing: { tag: "baz-helper-a" }
+        - existing: { tag: "baz-helper-b" }
+  - name: "baz-helper-a"
     continual:
-      - branched:
-          type: script-variable
-          variable: type
-          script: |
-            type = ctx['type']
-          patterns:
-            a: a*
-            b: b*
-          fields:
-            0: letter
+      - linear: { pattern: "a*", fields: { 0: letter } }
+      # TODO pass fields through without scripts
     serialization-script: |
       out['letter'] = inp['letter']:as_string()
     deserialization-script: |
       out['letter'] = inp['letter']
+  - name: "baz-helper-b"
+    continual:
+      - linear: { pattern: "b*", fields: { 0: letter } }
+    serialization-script: |
+      out['letter'] = inp['letter']:as_string()
+    deserialization-script: |
+      out['letter'] = inp['letter']
+
   - name: "pos"
     continual:
       - linear:

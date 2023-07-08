@@ -31,45 +31,68 @@ using DynGroupValues = std::unordered_map<std::size_t, std::string>;
 
 using Script = std::string;
 
-struct Existing
+struct ConExisting
 {
     std::string tag;
     std::optional<std::string> prefix;
 };
 
-struct Linear
+struct BraExisting
+{
+    std::string tag;
+    std::optional<std::string> prefix;
+};
+
+struct RecExisting
+{
+    std::string tag;
+    std::optional<std::string> prefix;
+
+    bool wrap;
+    std::optional<std::string> default_value;
+};
+
+struct ConLinear
 {
     details::yaml::Regex pattern;
     std::optional<DynGroupValues> dyn_groups;
     std::optional<GroupValues> fields;
 };
 
-struct BranchedMatchSuccessfulness
+struct BraLinear
 {
-    std::vector<details::yaml::Regex> patterns;
+    details::yaml::Regex pattern;
+    std::optional<DynGroupValues> dyn_groups;
     std::optional<GroupValues> fields;
 };
 
-struct BranchedScriptVariable
+struct RecLinear
 {
-    using Patterns = std::unordered_map<std::string, details::yaml::Regex>;
-
-    std::string variable;
-    Script script;
-    Patterns patterns;
+    details::yaml::Regex pattern;
+    std::optional<DynGroupValues> dyn_groups;
     std::optional<GroupValues> fields;
+
+    bool wrap;
+    std::optional<std::string> default_value;
 };
 
-using Branched = std::variant<BranchedMatchSuccessfulness, BranchedScriptVariable>;
+struct RecInfix
+{
+    details::yaml::Regex pattern;
+};
 
-using Continual = std::variant<Existing, Linear, Branched>;
+using Continual = std::vector<std::variant<ConExisting, ConLinear>>;
+using Recurrent = std::vector<std::variant<RecExisting, RecLinear, RecInfix>>;
+struct Branched
+{
+    Script branching_script;
+    Script debranching_script;
 
-using Recurrent = std::variant<Linear, Branched>; // FIXME wrong
+    using Rules = std::variant<BraExisting, BraLinear>;
+    std::vector<Rules> rules;
+};
 
-using Continuals = std::vector<Continual>;
-using Recurrents = std::vector<Recurrent>;
-
-using Nested = std::variant<Continuals, Recurrents>;
+using Nested = std::variant<Continual, Recurrent, Branched>;
 
 struct Tag
 {

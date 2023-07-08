@@ -55,6 +55,12 @@ int main()
 
             auto operator<=>(const Input&) const = default;
         } input{ from, to };
+        /*
+            from-x
+            from-y
+            to-x
+            to-y
+        */
 
         const auto bar_to_prop = [](dynser::Context&, const Bar& target) {
             return dynser::Properties{ { "is-left", { target.is_left } } };
@@ -122,7 +128,7 @@ int main()
                 return false;
             return target == *deserialize_result;
         };
-
+        
         ser.context["val-length"] = { std::make_any<std::string>("4") };
         ser.context["type"] = { std::make_any<std::string>("a") };
 

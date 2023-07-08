@@ -1,6 +1,60 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
   "$id": "0.2",
+  "definitions": {
+    "field-pattern": {
+      "type": "string",
+      "description": "field serialization pattern"
+    },
+    "linear": {
+      "fields": {
+        "type": "object",
+        "description": "fields to [de]serialize",
+        "propertyNames": {
+          "pattern": "\\d+"
+        },
+        "patternProperties": {
+          "\\d+": {
+            "type": "string",
+            "description": "field name"
+          }
+        }
+      },
+      "dyn-groups": {
+        "type": "object",
+        "description": "groups what resolves in runtime",
+        "propertyNames": {
+          "pattern": "\\d+"
+        },
+        "patternProperties": {
+          "\\d+": {
+            "type": "string",
+            "description": "context variable name"
+          }
+        }
+      }
+    },
+    "existing": {
+      "tag": {
+        "type": "string",
+        "description": "existing tag name"
+      },
+      "prefix": {
+        "type": "string",
+        "description": "prefix field names to prevent collisions"
+      }
+    },
+    "recurrent": {
+      "wrap": {
+        "type": "boolean",
+        "description": "behavior when requesting an item outside the list boundaries: if true then request by wrapping list else use value from default section"
+      },
+      "default": {
+        "type": "string",
+        "description": "default value on of bounds element request"
+      }
+    }
+  },
   "type": "object",
   "required": [
     "version",
@@ -25,17 +79,17 @@
           "name": {
             "type": "string",
             "description": "tag name",
-            "pattern": "^[\\w\\-]+$"
+            "$comment": "'@' is reserved symbol",
+            "pattern": "^[a-zA-Z\\-]+$"
           },
           "continual": {
             "type": "array",
-            "description": "pieces which describes tag [de]serialization",
-            "$comment": "scope for nested tag fields are shared FIXME sure of it (use different names for different fields)",
+            "description": "pieces which describes tag (de)serialization",
             "items": {
               "type": "object",
               "description": "field type",
               "propertyNames": {
-                "pattern": "existing|linear|branched|recurrent"
+                "pattern": "existing|linear"
               },
               "patternProperties": {
                 "existing": {
@@ -46,12 +100,10 @@
                   "description": "existing field rule",
                   "properties": {
                     "tag": {
-                      "type": "string",
-                      "description": "existing tag name"
+                      "$ref": "#/definitions/existing/tag"
                     },
                     "prefix": {
-                      "type": "string",
-                      "description": "prefix field names to prevent collisions"
+                      "$ref": "#/definitions/existing/prefix"
                     }
                   }
                 },
@@ -60,159 +112,113 @@
                   "required": [
                     "pattern"
                   ],
-                  "description": "define one-pattern unnamed rule",
+                  "description": "define one-pattern rule",
                   "properties": {
                     "pattern": {
-                      "type": "string",
-                      "description": "field serialization pattern"
+                      "$ref": "#/definitions/field-pattern"
                     },
                     "fields": {
-                      "type": "object",
-                      "description": "fields to [de]serialize",
-                      "propertyNames": {
-                        "pattern": "\\d+"
-                      },
-                      "patternProperties": {
-                        "\\d+": {
-                          "type": "string",
-                          "description": "field name"
-                        }
-                      }
+                      "$ref": "#/definitions/linear/fields"
                     },
                     "dyn-groups": {
-                      "type": "object",
-                      "description": "groups what resolves in runtime",
-                      "propertyNames": {
-                        "pattern": "\\d+"
-                      },
-                      "patternProperties": {
-                        "\\d+": {
-                          "type": "string",
-                          "description": "context variable name"
-                        }
-                      }
-                    }
-                  }
-                },
-                "branched": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "patterns"
-                  ],
-                  "description": "define unnamed rule with several variants",
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "description": "branching type",
-                      "pattern": "script-variable|match-successfulness"
-                    },
-                    "variable": {
-                      "type": "string",
-                      "description": "[script-variable] variable name"
-                    },
-                    "script": {
-                      "type": "string",
-                      "description": "[script-variable] lua script to resolve variable value"
-                    },
-                    "patterns": {
-                      "oneOf": [
-                        {
-                          "type": "array",
-                          "description": "[match-successfulness] list of patterns",
-                          "items": {
-                            "type": "string",
-                            "description": "one of patterns to match"
-                          }
-                        },
-                        {
-                          "type": "object",
-                          "description": "[script-variable] map from variable values to patterns",
-                          "propertyNames": {
-                            "pattern": "^.+$"
-                          },
-                          "patternProperties": {
-                            "^.+$": {
-                              "type": "string",
-                              "description": "pattern"
-                            }
-                          }
-                        }
-                      ]
-                    },
-                    "fields": {
-                      "type": "object",
-                      "description": "fields to [de]serialize",
-                      "propertyNames": {
-                        "pattern": "\\d+"
-                      },
-                      "patternProperties": {
-                        "\\d+": {
-                          "type": "string",
-                          "description": "field name"
-                        }
-                      }
-                    },
-                    "dyn-groups": {
-                      "type": "object",
-                      "description": "groups what resolves in runtime",
-                      "propertyNames": {
-                        "pattern": "\\d+"
-                      },
-                      "patternProperties": {
-                        "\\d+": {
-                          "type": "string",
-                          "description": "context variable name"
-                        }
-                      }
-                    }
-                  }
-                },
-                "recurrent": {
-                  "$comment": "use to handle lists",
-                  "type": "object",
-                  "required": [
-                    "pattern"
-                  ],
-                  "description": "define repeating pattern unnamed rule",
-                  "properties": {
-                    "pattern": {
-                      "type": "string",
-                      "description": "field serialization pattern"
-                    },
-                    "fields": {
-                      "type": "object",
-                      "description": "fields to [de]serialize",
-                      "propertyNames": {
-                        "pattern": "\\d+"
-                      },
-                      "patternProperties": {
-                        "\\d+": {
-                          "type": "string",
-                          "description": "field name"
-                        }
-                      }
-                    },
-                    "dyn-groups": {
-                      "type": "object",
-                      "description": "groups what resolves in runtime",
-                      "propertyNames": {
-                        "pattern": "\\d+"
-                      },
-                      "patternProperties": {
-                        "\\d+": {
-                          "type": "string",
-                          "description": "context variable name"
-                        }
-                      }
+                      "$ref": "#/definitions/linear/dyn-groups"
                     }
                   }
                 }
               }
             }
           },
+          "branched": {
+            "type": "object",
+            "description": "use to branch serialization by fields",
+            "required": [
+              "branching-script",
+              "debranching-script",
+              "rules"
+            ],
+            "properties": {
+              "branching-script": {
+                "type": "string",
+                "description": "lua serialization script: set variable 'branch' to choose rule"
+              },
+              "debranching-script": {
+                "type": "string",
+                "description": "lua deserialization script: set variant type variables what determines it actual type"
+              },
+              "rules": {
+                "$ref": "#/properties/tags/items/properties/continual"
+              }
+            }
+          },
           "recurrent": {
-
+            "type": "array",
+            "description": "use to handle repeating data",
+            "items": {
+              "type": "object",
+              "description": "field type",
+              "propertyNames": {
+                "pattern": "existing|linear|infix"
+              },
+              "patternProperties": {
+                "existing": {
+                  "type": "object",
+                  "required": [
+                    "tag"
+                  ],
+                  "description": "existing field rule",
+                  "properties": {
+                    "tag": {
+                      "$ref": "#/definitions/existing/tag"
+                    },
+                    "prefix": {
+                      "$ref": "#/definitions/existing/prefix"
+                    },
+                    "wrap": {
+                      "$ref": "#/definitions/recurrent/wrap"
+                    },
+                    "default": {
+                      "$ref": "#/definitions/recurrent/default"
+                    }
+                  }
+                },
+                "linear": {
+                  "type": "object",
+                  "required": [
+                    "pattern"
+                  ],
+                  "description": "define one-pattern rule",
+                  "properties": {
+                    "pattern": {
+                      "$ref": "#/definitions/field-pattern"
+                    },
+                    "fields": {
+                      "$ref": "#/definitions/linear/fields"
+                    },
+                    "dyn-groups": {
+                      "$ref": "#/definitions/linear/dyn-groups"
+                    },
+                    "wrap": {
+                      "$ref": "#/definitions/recurrent/wrap"
+                    },
+                    "default": {
+                      "$ref": "#/definitions/recurrent/default"
+                    }
+                  }
+                },
+                "infix": {
+                  "type": "object",
+                  "required": [
+                    "pattern"
+                  ],
+                  "description": "linear rule, what will not be applied to last element",
+                  "properties": {
+                    "pattern": {
+                      "$ref": "#/definitions/field-pattern"
+                    }
+                  }
+                }
+              }
+            }
           },
           "serialization-script": {
             "type": "string",

@@ -145,14 +145,14 @@ public:
         // nested
         return util::visit_one(
             tag_config.nested,
-            [&](const config::details::yaml::Continuals& continuals) -> SerializeResult {
+            [&](const config::details::yaml::Continual& continual) -> SerializeResult {
                 using namespace config::details::yaml;
                 std::string result;
 
-                for (const auto& continual : continuals) {
+                for (const auto& rule : continual) {
                     const auto serialized_continual = util::visit_one(
-                        continual,
-                        [&](const Existing& nested) -> SerializeResult {
+                        rule,
+                        [&](const ConExisting& nested) -> SerializeResult {
                             const auto inp = util::remove_prefix(props, nested.prefix ? *nested.prefix : "");
                             const auto serialize_result = serialize_props(inp, nested.tag);
                             if (!serialize_result) {
@@ -160,7 +160,7 @@ public:
                             }
                             return *serialize_result;
                         },
-                        [&](const Linear& nested) -> SerializeResult {
+                        [&](const ConLinear& nested) -> SerializeResult {
                             const auto pattern =
                                 nested.dyn_groups
                                     ? config::details::resolve_dyn_regex(
@@ -187,13 +187,34 @@ public:
 
                 return result;
             },
-            [&](const config::details::yaml::Recurrents& recurrents) -> SerializeResult {
+            [&](const config::details::yaml::Branched& branched) -> SerializeResult {
                 using namespace config::details::yaml;
                 std::string result;
 
-                for (const auto& recurrent : recurrents) {
-                    const auto serialized_recurrent =
-                        util::visit_one(recurrent, [&](const auto& dymmy) -> SerializeResult { return {}; });
+                for (const auto& branched_rule : branched.rules) {
+                    const auto serialized_branched = util::visit_one(
+                        branched_rule,
+                        // FIXME
+                        [&](const auto& dymmy) -> SerializeResult { return {}; }
+                    );
+                    if (!serialized_branched) {
+                        return serialized_branched;
+                    }
+                    result += *serialized_branched;
+                }
+
+                return result;
+            },
+            [&](const config::details::yaml::Recurrent& recurrent) -> SerializeResult {
+                using namespace config::details::yaml;
+                std::string result;
+
+                for (const auto& recurrent_rule : recurrent) {
+                    const auto serialized_recurrent = util::visit_one(
+                        recurrent_rule,
+                        // FIXME
+                        [&](const auto& dymmy) -> SerializeResult { return {}; }
+                    );
                     if (!serialized_recurrent) {
                         return serialized_recurrent;
                     }

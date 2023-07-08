@@ -1,5 +1,6 @@
 #include "config.h"
 
+#include "keywords.h"
 #include "yaml-cpp/yaml.h"
 
 #include <charconv>
@@ -115,64 +116,108 @@ inline std::optional<Res> as_opt(YAML::Node const& node) noexcept
 
 std::optional<Config> dynser::config::from_string(const std::string_view sv) noexcept
 {
+    // FIXME add tags to field names to prevent collisions
+
     try {
+        using namespace dynser::config;
+        using namespace dynser::config::details::yaml;
+
         const auto yaml = YAML::Load(std::string{ sv });
         Config result;
 
-        result.version = yaml["version"].as<std::string>();
+        result.version = yaml[keywords::VERSION].as<std::string>();
 
-        for (const auto tag : yaml["tags"]) {
-            const auto tag_name = tag["name"].as<std::string>();
+        for (const auto tag : yaml[keywords::TAGS]) {
+            const auto tag_name = tag[keywords::NAME].as<std::string>();
 
             result.tags[tag_name] = {
                 .name = tag_name,
                 .nested = [&]() -> details::yaml::Nested {    // iife
-                    if (const auto continual = tag["continual"]) {
-                        std::vector<details::yaml::Continual> result;
+                    if (const auto continual = tag[keywords::NESTED_CONTINUAL]) {
+                        details::yaml::Continual nested;
 
-                        for (const auto continual_type : continual) {
-                            if (const auto nested = continual_type["existing"]) {
-                                result.push_back(details::yaml::Existing{ .tag = nested["tag"].as<std::string>(),
-                                                                          .prefix =
-                                                                              as_opt<std::string>(nested["prefix"]) });
+                        for (const auto continual_rule_type : continual) {
+                            if (const auto rule = continual_rule_type[keywords::CONTINUAL_EXISTING]) {
+                                nested.push_back(details::yaml::ConExisting{
+                                    .tag = rule[keywords::CONTINUAL_EXISTING_TAG].as<std::string>(),
+                                    .prefix = as_opt<std::string>(rule[keywords::CONTINUAL_EXISTING_PREFIX]) });
                             }
-                            else if (const auto nested = continual_type["linear"]) {
-                                result.push_back(details::yaml::Linear{
-                                    .pattern = nested["pattern"].as<std::string>(),
-                                    .dyn_groups = as_opt<details::yaml::DynGroupValues>(nested["dyn-groups"]),
-                                    .fields = as_opt<details::yaml::GroupValues>(nested["fields"]) });
-                            }
-                            else if (const auto nested = continual_type["branched"]) {
-                                const auto type{ nested["type"].as<std::string>() };
-                                if (type == "match-successfulness") {
-                                    result.push_back(details::yaml::Branched{
-                                        details::yaml::BranchedMatchSuccessfulness{
-                                            .patterns = nested["patterns"].as<std::vector<details::yaml::Regex>>(),
-                                            .fields = as_opt<details::yaml::GroupValues>(nested["fields"]) } });
-                                }
-                                else if (type == "script-variable") {
-                                    result.push_back(details::yaml::Branched{ details::yaml::BranchedScriptVariable{
-                                        .variable = nested["variable"].as<std::string>(),
-                                        .script = nested["script"].as<std::string>(),
-                                        .patterns =
-                                            nested["patterns"].as<details::yaml::BranchedScriptVariable::Patterns>(),
-                                        .fields = as_opt<details::yaml::GroupValues>(nested["fields"]) } });
-                                }
+                            else if (const auto rule = continual_rule_type[keywords::CONTINUAL_LINEAR]) {
+                                nested.push_back(details::yaml::ConLinear{
+                                    .pattern = rule[keywords::CONTINUAL_LINEAR_PATTERN].as<std::string>(),
+                                    .dyn_groups = as_opt<details::yaml::DynGroupValues>(
+                                        rule[keywords::CONTINUAL_LINEAR_DYN_GROUPS]
+                                    ),
+                                    .fields =
+                                        as_opt<details::yaml::GroupValues>(rule[keywords::CONTINUAL_LINEAR_FIELDS]) });
                             }
                         }
 
-                        return result;
+                        return nested;
                     }
-                    else if (const auto recurrent = tag["recurrent"]) {
-                        std::vector<details::yaml::Recurrent> result;
+                    else if (const auto branched = tag[keywords::NESTED_BRANCHED]) {
+                        details::yaml::Branched nested;
 
-                        result.push_back(details::yaml::Recurrent{});
+                        nested.branching_script = branched[keywords::BRANCHED_BRANCHING_SCRIPT].as<std::string>();
+                        nested.debranching_script = branched[keywords::BRANCHED_DEBRANCHING_SCRIPT].as<std::string>();
 
-                        return result;
+                        for (const auto branched_rule_type : branched[keywords::BRANCHED_RULES]) {
+                            if (const auto rule = branched_rule_type[keywords::BRANCHED_EXISTING]) {
+                                nested.rules.push_back(details::yaml::BraExisting{
+                                    .tag = rule[keywords::BRANCHED_EXISTING_TAG].as<std::string>(),
+                                    .prefix = as_opt<std::string>(rule[keywords::BRANCHED_EXISTING_PREFIX]) });
+                            }
+                            else if (const auto rule = branched_rule_type[keywords::BRANCHED_LINEAR]) {
+                                nested.rules.push_back(details::yaml::BraLinear{
+                                    .pattern = rule[keywords::BRANCHED_LINEAR_PATTERN].as<std::string>(),
+                                    .dyn_groups =
+                                        as_opt<details::yaml::DynGroupValues>(rule[keywords::BRANCHED_LINEAR_DYN_GROUPS]
+                                        ),
+                                    .fields =
+                                        as_opt<details::yaml::GroupValues>(rule[keywords::BRANCHED_LINEAR_FIELDS]) });
+                            }
+                        }
+
+                        return nested;
+                    }
+                    else if (const auto recurrent = tag[keywords::NESTED_RECURRENT]) {
+                        details::yaml::Recurrent nested;
+
+                        for (const auto recurrent_rule_type : recurrent) {
+                            if (const auto rule = recurrent_rule_type[keywords::RECURRENT_EXISTING]) {
+                                nested.push_back(RecExisting{
+                                    .tag = rule[keywords::RECURRENT_EXISTING_TAG].as<std::string>(),
+                                    .prefix = rule[keywords::RECURRENT_EXISTING_PREFIX].as<std::string>(),
+                                    .wrap = rule[keywords::RECURRENT_EXISTING_WRAP].as<bool>(),
+                                    .default_value =
+                                        as_opt<std::string>(rule[keywords::RECURRENT_EXISTING_DEFAULT_VALUE]),
+                                });
+                            }
+                            else if (const auto rule = recurrent_rule_type[keywords::RECURRENT_LINEAR]) {
+                                nested.push_back(RecLinear{
+                                    .pattern = rule[keywords::RECURRENT_LINEAR_PATTERN].as<std::string>(),
+                                    .dyn_groups = as_opt<details::yaml::DynGroupValues>(
+                                        rule[keywords::RECURRENT_LINEAR_DYN_GROUPS]
+                                    ),
+                                    .fields =
+                                        as_opt<details::yaml::GroupValues>(rule[keywords::RECURRENT_LINEAR_FIELDS]),
+                                    .wrap = rule[keywords::RECURRENT_LINEAR_WRAP].as<bool>(),
+                                    .default_value =
+                                        as_opt<std::string>(rule[keywords::RECURRENT_LINEAR_DEFAULT_VALUE]),
+                                });
+                            }
+                            else if (const auto rule = recurrent_rule_type[keywords::RECURRENT_INFIX]) {
+                                nested.push_back(RecInfix{
+                                    .pattern = rule[keywords::RECURRENT_INFIX_PATTERN].as<std::string>(),
+                                });
+                            }
+                        }
+
+                        return nested;
                     }
                 }(),
-                .serialization_script = as_opt<details::yaml::Script>(tag["serialization-script"]),
-                .deserialization_script = as_opt<details::yaml::Script>(tag["deserialization-script"])
+                .serialization_script = as_opt<details::yaml::Script>(tag[keywords::SERIALIZATION_SCRIPT]),
+                .deserialization_script = as_opt<details::yaml::Script>(tag[keywords::DESERIALIZATION_SCRIPT]),
             };
         }
 

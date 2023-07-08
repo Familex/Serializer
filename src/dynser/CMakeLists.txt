@@ -17,6 +17,7 @@ add_library (
     "config/regex/to_string.h" "config/regex/to_string.cpp"
     "config/regex/from_string.h" "config/regex/from_string.cpp"
     "config/structures.h"
+    "config/keywords.h"
 )
 
 set_property (TARGET dynser PROPERTY CXX_STANDARD 23)
