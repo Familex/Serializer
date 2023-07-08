@@ -83,7 +83,7 @@ int main()
                 prop_to_bar,
                 [&prop_to_bar](dynser::Context& ctx, dynser::Properties&& props, Foo& out) {
                     Bar bar;
-                    prop_to_bar(ctx, dynser::util::remove_prefix(props, "bar"), bar);
+                    prop_to_bar(ctx, dynser::Properties{ props }, bar);
                     out = { bar,
                             std::any_cast<std::int32_t>(props["dot-stopped"].data),
                             std::any_cast<std::int32_t>(props["len-stopped"].data) };
@@ -100,7 +100,7 @@ int main()
             dynser::TargetToPropertyMapper{
                 bar_to_prop,
                 [&bar_to_prop](dynser::Context& ctx, const Foo& target) {
-                    return dynser::util::add_prefix(bar_to_prop(ctx, target.bar), "bar") + dynser::Properties{
+                    return bar_to_prop(ctx, target.bar) + dynser::Properties{
                         { "dot-stopped", { target.dot } },
                         { "len-stopped", { target.dyn } },
                     };
@@ -128,7 +128,7 @@ int main()
                 return false;
             return target == *deserialize_result;
         };
-        
+
         ser.context["val-length"] = { std::make_any<std::string>("4") };
         ser.context["type"] = { std::make_any<std::string>("a") };
 

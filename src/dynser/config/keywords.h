@@ -5,6 +5,18 @@ namespace dynser::config::keywords
 
 #define DYNSER_NEW_KEYWORD inline constexpr auto
 
+//==== lua
+
+DYNSER_NEW_KEYWORD INPUT_TABLE = "inp";    // 'in' is a lua keyword
+DYNSER_NEW_KEYWORD OUTPUT_TABLE = "out";
+DYNSER_NEW_KEYWORD CONTEXT = "ctx";
+DYNSER_NEW_KEYWORD BRANCHED_RULE_IND_VARIABLE = "branch";
+DYNSER_NEW_KEYWORD BRANCHED_RULE_IND_ERRVAL = -1;    // not exactly keyword
+
+//==== lua
+
+//==== yaml
+
 DYNSER_NEW_KEYWORD VERSION = "version";
 DYNSER_NEW_KEYWORD TAGS = "tags";
 
@@ -46,6 +58,8 @@ DYNSER_NEW_KEYWORD BRANCHED_EXISTING_PREFIX = "prefix";
 DYNSER_NEW_KEYWORD BRANCHED_LINEAR_PATTERN = "pattern";
 DYNSER_NEW_KEYWORD BRANCHED_LINEAR_DYN_GROUPS = "dyn-groups";
 DYNSER_NEW_KEYWORD BRANCHED_LINEAR_FIELDS = "fields";
+
+//==== yaml
 
 #undef NEW_KEYWORD
 

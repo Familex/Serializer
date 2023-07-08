@@ -139,7 +139,7 @@
             "properties": {
               "branching-script": {
                 "type": "string",
-                "description": "lua serialization script: set variable 'branch' to choose rule"
+                "description": "lua serialization script: set variable 'branch' to choose rule (value '-1' is unset)"
               },
               "debranching-script": {
                 "type": "string",
