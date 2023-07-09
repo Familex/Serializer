@@ -86,4 +86,18 @@ tags:
           prefix: to
       - linear:
           pattern: '\)'
+
+  # experimental
+  - name: "recursive"
+    continual:
+       - linear: { pattern: '(-?\d+), ', fields: { 1: element } }
+       - existing: { tag: "recursive", prefix: "next" }
+    serialization-script: |
+      if inp['element'] ~= nil then
+        out['element'] = tostring(inp['element']:as_i32())
+      end
+      -- else do nothing and trigger check in c++ code
+    deserialization-script: |
+      -- recursion exit?
+      out['element'] = tonumber(inp['element'])
 ...

@@ -7,8 +7,10 @@
 #include "structs/fields.hpp"
 #include "util/prefix.hpp"
 #include "util/visit.hpp"
+#include <unordered_set>
 
 #include <fstream>
+#include <ranges>
 #include <sstream>
 #include <string>
 
@@ -42,7 +44,16 @@ struct TargetToPropertyMapper : Fs...
 template <typename... Fs>
 TargetToPropertyMapper(Fs...) -> TargetToPropertyMapper<Fs...>;
 
-using SerializeResult = std::optional<std::string>;
+// FIXME WRONG
+enum class SerializeError {
+    Unknown,
+    ScriptVariableNotFound
+};
+
+// FIXME WRONG
+constexpr auto nullopt = std::unexpected{ SerializeError::Unknown };
+
+using SerializeResult = std::expected<std::string, SerializeError>;
 
 namespace details
 {
@@ -110,7 +121,7 @@ class DynSer
             const auto inp = nested.prefix ? util::remove_prefix(props, *nested.prefix) : props;
             const auto serialize_result = this->serialize_props(inp, nested.tag);
             if (!serialize_result) {
-                return std::nullopt;
+                return nullopt;
             }
             return *serialize_result;
         };
@@ -128,11 +139,15 @@ class DynSer
                           *dynser::details::merge_maps(*nested.dyn_groups, dynser::details::props_to_fields(context))
                       )
                     : nested.pattern;
-            const auto regex_fields = nested.fields ? *dynser::details::merge_maps(*nested.fields, after_script_fields)
-                                                    : config::details::yaml::GroupValues{};
-            const auto to_string_result = config::details::resolve_regex(pattern, regex_fields);
+            const auto regex_fields = nested.fields ? dynser::details::merge_maps(*nested.fields, after_script_fields)
+                                                    : std::optional{ config::details::yaml::GroupValues{} };
+            if (!regex_fields) {
+                // failed to merge script variables (script not set all variables or failed to execute)
+                return std::unexpected{ SerializeError::ScriptVariableNotFound };
+            }
+            const auto to_string_result = config::details::resolve_regex(pattern, *regex_fields);
             if (!to_string_result) {
-                return std::nullopt;
+                return nullopt;
             }
             return *to_string_result;
         };
@@ -161,6 +176,10 @@ public:
     // FIXME proper error handling
     SerializeResult serialize_props(const Properties& props, const std::string_view tag) noexcept
     {
+        if (!config_) {
+            return nullopt;
+        }
+
         using namespace config::details::yaml;
         using namespace config;
 
@@ -179,7 +198,7 @@ public:
             const auto script_run_result = state.runString(script->c_str());
             if (script_run_result != LUA_OK) {
                 const auto error = state.read<std::string>(-1);
-                return std::nullopt;
+                return nullopt;
             }
         }
         const auto fields = state[keywords::OUTPUT_TABLE].read<dynser::Fields>();
@@ -198,6 +217,10 @@ public:
                         gen_linear_process_helper<ConLinear>(props, fields)
                     );
                     if (!serialized_continual) {
+                        if (serialized_continual.error() == SerializeError::ScriptVariableNotFound) {
+                            // FIXME WRONG
+                            return "";
+                        }
                         return serialized_continual;
                     }
                     result += *serialized_continual;
@@ -218,14 +241,14 @@ public:
                     branched_script_state.runString(branched.branching_script.c_str());
                 if (branched_script_run_result != LUA_OK) {
                     const auto error = branched_script_state.read<std::string>(-1);
-                    return std::nullopt;
+                    return nullopt;
                 }
                 const auto branched_rule_ind = branched_script_state[keywords::BRANCHED_RULE_IND_VARIABLE].read<int>();
                 if (branched_rule_ind == BRANCHED_RULE_IND_ERRVAL) {
-                    return std::nullopt;
+                    return nullopt;
                 }
                 if (branched_rule_ind >= branched.rules.size()) {
-                    return std::nullopt;
+                    return nullopt;
                 }
 
                 return util::visit_one(
@@ -237,27 +260,9 @@ public:
             [&](const Recurrent& recurrent) -> SerializeResult {
                 std::string result;
 
-                for (const auto& recurrent_rule : recurrent) {
-                    const auto serialized_recurrent = util::visit_one(
-                        recurrent_rule,
-                        [&](const RecExisting& dymmy) -> SerializeResult {
-                            // FIXME
-                            return {};
-                        },
-                        [&](const RecLinear& dymmy) -> SerializeResult {
-                            // FIXME
-                            return {};
-                        },
-                        [&](const RecInfix& dymmy) -> SerializeResult {
-                            // FIXME
-                            return {};
-                        }
-                    );
-                    if (!serialized_recurrent) {
-                        return serialized_recurrent;
-                    }
-                    result += *serialized_recurrent;
-                }
+                const auto handle_wrap = [](const auto& fields, const auto& rule) {
+                    // FIXME
+                };
 
                 return result;
             }
@@ -265,10 +270,10 @@ public:
     }
 
     template <typename Target>
-    std::optional<std::string> serialize(const Target& target, const std::string_view tag) noexcept
+    SerializeResult serialize(const Target& target, const std::string_view tag) noexcept
     {
         if (!config_) {
-            return std::nullopt;
+            return nullopt;
         }
 
         return serialize_props(ttpm(context, target), tag);

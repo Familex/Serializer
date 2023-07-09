@@ -79,6 +79,7 @@ int main()
         };
 
         dynser::DynSer ser{
+            // deserialization
             dynser::PropertyToTargetMapper{
                 prop_to_bar,
                 [&prop_to_bar](dynser::Context& ctx, dynser::Properties&& props, Foo& out) {
@@ -96,7 +97,14 @@ int main()
                     prop_to_pos(ctx, dynser::util::remove_prefix(props, "to"), to);
                     out = { from, to };
                 },
+                [](this auto const& self, dynser::Context& ctx, dynser::Properties&& props, std::vector<int>& out) {
+                    if (!props.contains("element"))
+                        return;
+                    out.push_back(props["element"].as_i32());
+                    self(ctx, dynser::util::remove_prefix(props, "next"), out);
+                },
             },
+            // serialization
             dynser::TargetToPropertyMapper{
                 bar_to_prop,
                 [&bar_to_prop](dynser::Context& ctx, const Foo& target) {
@@ -110,10 +118,24 @@ int main()
                 },
                 pos_to_prop,
                 [&pos_to_prop](dynser::Context& ctx, const Input& target) {
-                    return dynser::util::add_prefix(pos_to_prop(ctx, target.from), "from") +
+                    return dynser::util::add_prefix(pos_to_prop(ctx, target.from), "from") +    // clang-format comment
                            dynser::util::add_prefix(pos_to_prop(ctx, target.to), "to");
                 },
-            },
+                [](dynser::Context& ctx, const std::vector<int>& target) {
+                    dynser::Properties result;
+
+                    for (std::size_t cnt{}; const auto& el : target) {
+                        auto val = dynser::PropertyValue{ el };
+                        dynser::Properties val_prop{ { "element", val } };
+                        for (std::size_t i{}; i < cnt; ++i) {
+                            val_prop = dynser::util::add_prefix(val_prop, "next");
+                        }
+                        result.merge(val_prop);
+                        ++cnt;
+                    }
+
+                    return result;
+                } },
         };
         const auto load_result = ser.load_config(dynser::config::FileName{ "./yaml/example2.yaml" });
 
@@ -133,11 +155,12 @@ int main()
         ser.context["type"] = { std::make_any<std::string>("a") };
 
         std::size_t res{};
-        res += round_trip(foo, "foo");
-        res += round_trip(from, "pos");
-        res += round_trip(input, "input");
-        res += round_trip(bar, "bar");
-        res += round_trip(baz, "baz");
+        // res += round_trip(foo, "foo");
+        // res += round_trip(from, "pos");
+        // res += round_trip(input, "input");
+        // res += round_trip(bar, "bar");
+        // res += round_trip(baz, "baz");
+        res += round_trip(std::vector<int>{ 14, 15, 16, 1034, -1249, 0, 0, -12948 }, "recursive");
         // assert(res == 5);
     }
 

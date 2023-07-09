@@ -215,6 +215,8 @@ std::optional<Config> dynser::config::from_string(const std::string_view sv) noe
 
                         return nested;
                     }
+
+                    std::unreachable();
                 }(),
                 .serialization_script = as_opt<details::yaml::Script>(tag[keywords::SERIALIZATION_SCRIPT]),
                 .deserialization_script = as_opt<details::yaml::Script>(tag[keywords::DESERIALIZATION_SCRIPT]),

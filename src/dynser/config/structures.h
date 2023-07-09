@@ -2,6 +2,7 @@
 
 #include <unordered_map>
 
+#include <concepts>
 #include <optional>
 #include <string>
 #include <variant>
@@ -93,6 +94,8 @@ struct Branched
 };
 
 using Nested = std::variant<Continual, Recurrent, Branched>;
+template <typename Rule>
+concept NestedConcept = std::same_as<Rule, Continual> || std::same_as<Rule, Recurrent> || std::same_as<Rule, Branched>;
 
 struct Tag
 {
