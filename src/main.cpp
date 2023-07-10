@@ -17,6 +17,45 @@ struct Overload : Fs...
 int main()
 {
     if constexpr (true) {
+        struct Printer
+        {
+            std::string serialize_err_to_string(dynser::serialize_err::Error const& err) noexcept
+            {
+                using namespace dynser::serialize_err;
+
+                return std::visit(
+                    Overload{ [](const Unknown&) -> std::string { return "unknown error"; },
+                              [](const ConfigNotLoaded&) -> std::string { return "config not loaded"; },
+                              [](const BranchNotSet&) -> std::string { return "branch not set"; },
+                              [](const BranchOutOfBounds& error) -> std::string {
+                                  return std::format(
+                                      "seleced branch: '{}'; expected between 0 and '{}'",
+                                      error.selected_branch,
+                                      error.max_branch
+                                  );
+                              },
+                              [](const ScriptError& error) -> std::string {
+                                  return std::format("lua script error: '{}'", error.message);
+                              },
+                              [](const ScriptVariableNotFound& error) {
+                                  return std::format("script variable '{}' not set", error.variable_name);
+                              },
+                              [](const ResolveRegexError& error) -> std::string {
+                                  using enum dynser::config::details::regex::ToStringErrorType;
+
+                                  return std::format(
+                                      "regex error '{}' on group '{}'",
+                                      error.error.type == RegexSyntaxError ? "syntax error"
+                                      : error.error.type == MissingValue   ? "missing value"
+                                      : error.error.type == InvalidValue   ? "invalid value"
+                                                                           : "unknown error",
+                                      error.error.group_num
+                                  );
+                              } },
+                    err
+                );
+            }
+        } printer{};
         struct Bar
         {
             bool is_left;
@@ -98,11 +137,12 @@ int main()
                     out = { from, to };
                 },
                 [](this auto const& self, dynser::Context& ctx, dynser::Properties&& props, std::vector<int>& out) {
+                    auto last_element = props["last-element"].as_i32();
                     while (props.contains("element")) {
                         out.push_back(props["element"].as_i32());
                         props = dynser::util::remove_prefix(props, "next");
                     }
-                    out.push_back(props["last-element"].as_i32());
+                    out.push_back(last_element);
                 },
             },
             // serialization
@@ -142,15 +182,20 @@ int main()
         };
         const auto load_result = ser.load_config(dynser::config::FileName{ "./yaml/example2.yaml" });
 
-        const auto round_trip = [&ser](const auto& target, const std::string_view tag) noexcept {
+        const auto round_trip = [&ser, &printer](const auto& target, const std::string_view tag) noexcept {
             using T = std::remove_cvref_t<decltype(target)>;
             const auto serialize_result = ser.serialize(target, tag);
             std::cout << std::format("serialized '{}' is '{}'\n", tag, serialize_result ? *serialize_result : "none");
-            if (!serialize_result)
+            if (!serialize_result) {
+                std::cout << std::format(
+                    "Serialize error of '{}': {}", tag, printer.serialize_err_to_string(serialize_result.error())
+                );
                 return false;
+            }
             const auto deserialize_result = ser.deserialize<T>(*serialize_result, tag);
-            if (!deserialize_result)
+            if (!deserialize_result) {
                 return false;
+            }
             return target == *deserialize_result;
         };
 
@@ -158,11 +203,11 @@ int main()
         ser.context["type"] = { std::make_any<std::string>("a") };
 
         std::size_t res{};
-        // res += round_trip(foo, "foo");
-        // res += round_trip(from, "pos");
-        // res += round_trip(input, "input");
-        // res += round_trip(bar, "bar");
-        // res += round_trip(baz, "baz");
+        res += round_trip(foo, "foo");
+        res += round_trip(from, "pos");
+        res += round_trip(input, "input");
+        res += round_trip(bar, "bar");
+        res += round_trip(baz, "baz");
         res += round_trip(std::vector<int>{ 14, 15, 16, 1034, -1249, 0, 0, -12948 }, "recursive");
         // assert(res == 5);
     }

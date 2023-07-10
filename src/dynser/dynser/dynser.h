@@ -44,30 +44,77 @@ struct TargetToPropertyMapper : Fs...
 template <typename... Fs>
 TargetToPropertyMapper(Fs...) -> TargetToPropertyMapper<Fs...>;
 
-// FIXME WRONG
-enum class SerializeError {
-    Unknown,
-    ScriptVariableNotFound
+namespace serialize_err
+{
+
+struct Unknown
+{
+} unknown{};
+
+struct ConfigNotLoaded
+{
+} config_not_loaded{};
+
+struct BranchNotSet
+{
+} branch_not_set{};
+
+struct BranchOutOfBounds
+{
+    std::uint32_t selected_branch;
+    std::size_t max_branch;
 };
 
-// FIXME WRONG
-constexpr auto nullopt = std::unexpected{ SerializeError::Unknown };
+struct ScriptError
+{
+    std::string message;
+};
 
-using SerializeResult = std::expected<std::string, SerializeError>;
+struct ScriptVariableNotFound
+{
+    std::string variable_name;
+};
+
+struct ResolveRegexError
+{
+    config::details::regex::ToStringError error;
+};
+
+using Error = std::variant<
+    Unknown,
+    ScriptError,
+    ScriptVariableNotFound,
+    ResolveRegexError,
+    BranchNotSet,
+    BranchOutOfBounds,
+    ConfigNotLoaded>;
+
+}    // namespace serialize_err
+
+using SerializeResult = std::expected<std::string, serialize_err::Error>;
 
 namespace details
 {
 
+/**
+ * \brief Merge <'a, 'b> map and <'b, 'c> map into <'a, 'c> map.
+ * Uses ::key_type and ::mapped_type to get keys and values types.
+ */
 template <
     typename Lhs,
     typename Rhs,
-    typename Result = std::unordered_map<typename Lhs::key_type, typename Rhs::mapped_type>>
-std::optional<Result> merge_maps(const Lhs& lhs, const Rhs& rhs) noexcept
+    typename LhsKey = typename Lhs::key_type,
+    typename LhsValue = typename Lhs::mapped_type,
+    typename RhsKey = typename Rhs::key_type,
+    typename RhsValue = typename Rhs::mapped_type,
+    typename Result = std::unordered_map<LhsKey, RhsValue>>
+    requires std::same_as<LhsValue, RhsKey>
+std::expected<Result, LhsValue> merge_maps(const Lhs& lhs, const Rhs& rhs) noexcept
 {
     Result result{};
     for (auto& [key, inter] : lhs) {
         if (!rhs.contains(inter)) {
-            return std::nullopt;
+            return std::unexpected{ inter };
         }
         result[key] = rhs.at(inter);
     }
@@ -120,11 +167,14 @@ class DynSer
         return [&](const Existing& nested) noexcept -> dynser::SerializeResult {
             const auto inp = nested.prefix ? util::remove_prefix(props, *nested.prefix) : props;
             const auto serialize_result = this->serialize_props(inp, nested.tag);
-            if (!serialize_result && serialize_result.error() == SerializeError::ScriptVariableNotFound &&
+            if (!serialize_result &&
+                std::holds_alternative<serialize_err::ScriptVariableNotFound>(serialize_result.error()) &&
                 !nested.required)
             {
-                return ""; // recursion exit (maybe)
+                return "";    // can be recursion exit
             }
+
+            // Just pass through?
             return serialize_result;
         };
     }
@@ -134,6 +184,8 @@ class DynSer
     auto gen_linear_process_helper(const auto& props, const auto& after_script_fields) noexcept
     {
         return [&](const Linear& nested) noexcept -> dynser::SerializeResult {
+            using config::details::yaml::GroupValues;
+
             const auto pattern =
                 nested.dyn_groups
                     ? config::details::resolve_dyn_regex(
@@ -141,15 +193,18 @@ class DynSer
                           *dynser::details::merge_maps(*nested.dyn_groups, dynser::details::props_to_fields(context))
                       )
                     : nested.pattern;
-            const auto regex_fields = nested.fields ? dynser::details::merge_maps(*nested.fields, after_script_fields)
-                                                    : std::optional{ config::details::yaml::GroupValues{} };
-            if (!regex_fields) {
+            const auto regex_fields_sus = nested.fields
+                                              ? dynser::details::merge_maps(*nested.fields, after_script_fields)
+                                              : std::expected<GroupValues, std::string>{ GroupValues{} };
+            if (!regex_fields_sus) {
+                using SVNF = serialize_err::ScriptVariableNotFound;
                 // failed to merge script variables (script not set all variables or failed to execute)
-                return std::unexpected{ SerializeError::ScriptVariableNotFound };
+                return std::unexpected{ SVNF{ regex_fields_sus.error() } };
             }
-            const auto to_string_result = config::details::resolve_regex(pattern, *regex_fields);
+            const auto to_string_result = config::details::resolve_regex(pattern, *regex_fields_sus);
+
             if (!to_string_result) {
-                return nullopt;
+                return std::unexpected{ serialize_err::ResolveRegexError{ to_string_result.error() } };
             }
             return *to_string_result;
         };
@@ -179,7 +234,7 @@ public:
     SerializeResult serialize_props(const Properties& props, const std::string_view tag) noexcept
     {
         if (!config_) {
-            return nullopt;
+            return std::unexpected{ serialize_err::config_not_loaded };
         }
 
         using namespace config::details::yaml;
@@ -200,7 +255,7 @@ public:
             const auto script_run_result = state.runString(script->c_str());
             if (script_run_result != LUA_OK) {
                 const auto error = state.read<std::string>(-1);
-                return nullopt;
+                return std::unexpected{ serialize_err::ScriptError{ error } };
             }
         }
         const auto fields = state[keywords::OUTPUT_TABLE].read<dynser::Fields>();
@@ -219,6 +274,7 @@ public:
                         gen_linear_process_helper<ConLinear>(props, fields)
                     );
                     if (!serialized_continual) {
+                        // Just pass through?
                         return serialized_continual;
                     }
                     result += *serialized_continual;
@@ -239,14 +295,16 @@ public:
                     branched_script_state.runString(branched.branching_script.c_str());
                 if (branched_script_run_result != LUA_OK) {
                     const auto error = branched_script_state.read<std::string>(-1);
-                    return nullopt;
+                    return std::unexpected{ serialize_err::ScriptError{ error } };
                 }
                 const auto branched_rule_ind = branched_script_state[keywords::BRANCHED_RULE_IND_VARIABLE].read<int>();
                 if (branched_rule_ind == BRANCHED_RULE_IND_ERRVAL) {
-                    return nullopt;
+                    return std::unexpected{ serialize_err::branch_not_set };
                 }
                 if (branched_rule_ind >= branched.rules.size()) {
-                    return nullopt;
+                    return std::unexpected{ serialize_err::BranchOutOfBounds{
+                        .selected_branch = static_cast<std::uint32_t>(branched_rule_ind),
+                        .max_branch = branched.rules.size() - 1 } };
                 }
 
                 return util::visit_one(
@@ -258,9 +316,7 @@ public:
             [&](const Recurrent& recurrent) -> SerializeResult {
                 std::string result;
 
-                const auto handle_wrap = [](const auto& fields, const auto& rule) {
-                    // FIXME
-                };
+                // FIXME
 
                 return result;
             }
@@ -271,7 +327,7 @@ public:
     SerializeResult serialize(const Target& target, const std::string_view tag) noexcept
     {
         if (!config_) {
-            return nullopt;
+            return std::unexpected{ serialize_err::config_not_loaded };
         }
 
         return serialize_props(ttpm(context, target), tag);
