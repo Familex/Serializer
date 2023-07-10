@@ -19,11 +19,17 @@ int main()
     if constexpr (true) {
         struct Printer
         {
-            std::string serialize_err_to_string(dynser::serialize_err::Error const& err) noexcept
+            std::string serialize_err_to_string(dynser::SerializeError const& wrapper) noexcept
             {
                 using namespace dynser::serialize_err;
 
-                return std::visit(
+                std::string ref_str;
+
+                for (const auto& el : wrapper.ref_seq) {
+                    ref_str += std::format(" from '{}' tag at '{}' rule", el.tag, el.rule_ind);
+                }
+
+                auto error_str = std::visit(
                     Overload{ [](const Unknown&) -> std::string { return "unknown error"; },
                               [](const ConfigNotLoaded&) -> std::string { return "config not loaded"; },
                               [](const BranchNotSet&) -> std::string { return "branch not set"; },
@@ -52,8 +58,10 @@ int main()
                                       error.error.group_num
                                   );
                               } },
-                    err
+                    wrapper.error
                 );
+
+                return error_str + ref_str;
             }
         } printer{};
         struct Bar

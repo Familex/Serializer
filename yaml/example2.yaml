@@ -103,6 +103,7 @@ tags:
       - linear: { pattern: '(-?\d+), ', fields: { 1: element } }
       - existing: { tag: "recursive-payload", prefix: "next", required: false }
     serialization-script: |
+      inp['element']:as_i32() -- trigger error in main at -2 element
       if inp['element'] ~= nil then
         out['element'] = tostring(inp['element']:as_i32())
       end

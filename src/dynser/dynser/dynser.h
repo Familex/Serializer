@@ -48,16 +48,13 @@ namespace serialize_err
 {
 
 struct Unknown
-{
-} unknown{};
+{ };
 
 struct ConfigNotLoaded
-{
-} config_not_loaded{};
+{ };
 
 struct BranchNotSet
-{
-} branch_not_set{};
+{ };
 
 struct BranchOutOfBounds
 {
@@ -91,7 +88,31 @@ using Error = std::variant<
 
 }    // namespace serialize_err
 
-using SerializeResult = std::expected<std::string, serialize_err::Error>;
+// FIXME rename
+/**
+ * \brief Error place context on serialize error to handle nested rules.
+ */
+struct ErrorRef
+{
+    std::string tag;
+    std::size_t rule_ind{};
+};
+
+struct SerializeError
+{
+    serialize_err::Error error;
+    std::vector<ErrorRef> ref_seq{};
+};
+
+using SerializeResult = std::expected<std::string, SerializeError>;
+
+/**
+ * \brief helper.
+ */
+constexpr SerializeResult make_serialize_err(serialize_err::Error&& err) noexcept
+{
+    return std::unexpected{ SerializeError{ std::move(err), {} } };
+}
 
 namespace details
 {
@@ -168,14 +189,13 @@ class DynSer
             const auto inp = nested.prefix ? util::remove_prefix(props, *nested.prefix) : props;
             const auto serialize_result = this->serialize_props(inp, nested.tag);
             if (!serialize_result &&
-                std::holds_alternative<serialize_err::ScriptVariableNotFound>(serialize_result.error()) &&
+                std::holds_alternative<serialize_err::ScriptVariableNotFound>(serialize_result.error().error) &&
                 !nested.required)
             {
-                return "";    // can be recursion exit
+                return "";    // can be used as recursion exit
             }
 
-            // Just pass through?
-            return serialize_result;
+            return serialize_result; // pass through
         };
     }
 
@@ -197,14 +217,13 @@ class DynSer
                                               ? dynser::details::merge_maps(*nested.fields, after_script_fields)
                                               : std::expected<GroupValues, std::string>{ GroupValues{} };
             if (!regex_fields_sus) {
-                using SVNF = serialize_err::ScriptVariableNotFound;
                 // failed to merge script variables (script not set all variables or failed to execute)
-                return std::unexpected{ SVNF{ regex_fields_sus.error() } };
+                return make_serialize_err(serialize_err::ScriptVariableNotFound{ regex_fields_sus.error() });
             }
             const auto to_string_result = config::details::resolve_regex(pattern, *regex_fields_sus);
 
             if (!to_string_result) {
-                return std::unexpected{ serialize_err::ResolveRegexError{ to_string_result.error() } };
+                return make_serialize_err(serialize_err::ResolveRegexError{ to_string_result.error() });
             }
             return *to_string_result;
         };
@@ -230,11 +249,10 @@ public:
         return false;
     }
 
-    // FIXME proper error handling
     SerializeResult serialize_props(const Properties& props, const std::string_view tag) noexcept
     {
         if (!config_) {
-            return std::unexpected{ serialize_err::config_not_loaded };
+            return make_serialize_err(serialize_err::ConfigNotLoaded{});
         }
 
         using namespace config::details::yaml;
@@ -246,7 +264,6 @@ public:
         register_userdata_property_value(state);
         const auto& tag_config = config_->tags.at(std::string{ tag });
 
-        // FIXME push context
         state[keywords::CONTEXT] = context;
         state[keywords::INPUT_TABLE] = props;
         state[keywords::OUTPUT_TABLE] = Fields{};
@@ -255,7 +272,7 @@ public:
             const auto script_run_result = state.runString(script->c_str());
             if (script_run_result != LUA_OK) {
                 const auto error = state.read<std::string>(-1);
-                return std::unexpected{ serialize_err::ScriptError{ error } };
+                return make_serialize_err(serialize_err::ScriptError{ error });
             }
         }
         const auto fields = state[keywords::OUTPUT_TABLE].read<dynser::Fields>();
@@ -267,14 +284,18 @@ public:
                 using namespace config::details;
                 std::string result;
 
-                for (const auto& rule : continual) {
-                    const auto serialized_continual = util::visit_one(
+                for (std::size_t rule_ind{}; rule_ind < continual.size(); ++rule_ind) {
+                    const auto& rule = continual[rule_ind];
+
+                    auto serialized_continual = util::visit_one(
                         rule,
                         gen_existing_process_helper<ConExisting>(props, fields),
                         gen_linear_process_helper<ConLinear>(props, fields)
                     );
                     if (!serialized_continual) {
-                        // Just pass through?
+                        serialized_continual.error().ref_seq.emplace_back(
+                            std::string{ tag }, rule_ind
+                        );    // add ref to outside rule
                         return serialized_continual;
                     }
                     result += *serialized_continual;
@@ -295,23 +316,30 @@ public:
                     branched_script_state.runString(branched.branching_script.c_str());
                 if (branched_script_run_result != LUA_OK) {
                     const auto error = branched_script_state.read<std::string>(-1);
-                    return std::unexpected{ serialize_err::ScriptError{ error } };
+                    return make_serialize_err(serialize_err::ScriptError{ error });
                 }
                 const auto branched_rule_ind = branched_script_state[keywords::BRANCHED_RULE_IND_VARIABLE].read<int>();
                 if (branched_rule_ind == BRANCHED_RULE_IND_ERRVAL) {
-                    return std::unexpected{ serialize_err::branch_not_set };
+                    return make_serialize_err(serialize_err::BranchNotSet{});
                 }
                 if (branched_rule_ind >= branched.rules.size()) {
-                    return std::unexpected{ serialize_err::BranchOutOfBounds{
+                    return make_serialize_err(serialize_err::BranchOutOfBounds{
                         .selected_branch = static_cast<std::uint32_t>(branched_rule_ind),
-                        .max_branch = branched.rules.size() - 1 } };
+                        .max_branch = branched.rules.size() - 1 });
                 }
 
-                return util::visit_one(
+                auto serialized_branched = util::visit_one(
                     branched.rules[branched_rule_ind],
                     gen_existing_process_helper<BraExisting>(props, fields),
                     gen_linear_process_helper<BraLinear>(props, fields)
                 );
+
+                if (!serialized_branched) {
+                    serialized_branched.error().ref_seq.emplace_back(
+                        std::string{ tag }, branched_rule_ind
+                    );    // add ref to outside rule
+                }
+                return serialized_branched;
             },
             [&](const Recurrent& recurrent) -> SerializeResult {
                 std::string result;
@@ -327,7 +355,7 @@ public:
     SerializeResult serialize(const Target& target, const std::string_view tag) noexcept
     {
         if (!config_) {
-            return std::unexpected{ serialize_err::config_not_loaded };
+            return make_serialize_err(serialize_err::ConfigNotLoaded{});
         }
 
         return serialize_props(ttpm(context, target), tag);
