@@ -1,6 +1,6 @@
 ---
 # yaml-language-server: $schema=./schema_2.json
-version: "example2"
+version: 'example2'
 tags:
   - name: "foo"
     continual:
@@ -90,8 +90,18 @@ tags:
   # experimental
   - name: "recursive"
     continual:
-       - linear: { pattern: '(-?\d+), ', fields: { 1: element } }
-       - existing: { tag: "recursive", prefix: "next" }
+      - linear: { pattern: '\[ ' }
+      - existing: { tag: "recursive-payload" }
+      - linear: { pattern: '-?\d+', fields: { 0: last-element } }
+      - linear: { pattern: ' \]' }
+    serialization-script: |
+      out['last-element'] = tostring(inp['last-element']:as_i32())
+    deserialization-script: |
+      out['last-element'] = tonumber(inp['last-element'])
+  - name: "recursive-payload"
+    continual:
+      - linear: { pattern: '(-?\d+), ', fields: { 1: element } }
+      - existing: { tag: "recursive-payload", prefix: "next", required: false }
     serialization-script: |
       if inp['element'] ~= nil then
         out['element'] = tostring(inp['element']:as_i32())

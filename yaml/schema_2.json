@@ -35,13 +35,20 @@
       }
     },
     "existing": {
-      "tag": {
-        "type": "string",
-        "description": "existing tag name"
-      },
-      "prefix": {
-        "type": "string",
-        "description": "prefix field names to prevent collisions"
+      "properties": {
+        "tag": {
+          "type": "string",
+          "description": "existing tag name"
+        },
+        "prefix": {
+          "type": "string",
+          "description": "prefix field names to prevent collisions"
+        },
+        "required": {
+          "type": "boolean",
+          "description": "is this field required (may be used to break recursion sequence)",
+          "default": true
+        }
       }
     },
     "recurrent": {
@@ -98,14 +105,7 @@
                     "tag"
                   ],
                   "description": "existing field rule",
-                  "properties": {
-                    "tag": {
-                      "$ref": "#/definitions/existing/tag"
-                    },
-                    "prefix": {
-                      "$ref": "#/definitions/existing/prefix"
-                    }
-                  }
+                  "$ref": "#/definitions/existing"
                 },
                 "linear": {
                   "type": "object",
@@ -168,10 +168,13 @@
                   "description": "existing field rule",
                   "properties": {
                     "tag": {
-                      "$ref": "#/definitions/existing/tag"
+                      "$ref": "#/definitions/existing/properties/tag"
                     },
                     "prefix": {
-                      "$ref": "#/definitions/existing/prefix"
+                      "$ref": "#/definitions/existing/properties/prefix"
+                    },
+                    "required": {
+                      "$ref": "#/definitions/existing/properties/required"
                     },
                     "wrap": {
                       "$ref": "#/definitions/recurrent/wrap"

@@ -140,7 +140,9 @@ std::optional<Config> dynser::config::from_string(const std::string_view sv) noe
                             if (const auto rule = continual_rule_type[keywords::CONTINUAL_EXISTING]) {
                                 nested.push_back(details::yaml::ConExisting{
                                     .tag = rule[keywords::CONTINUAL_EXISTING_TAG].as<std::string>(),
-                                    .prefix = as_opt<std::string>(rule[keywords::CONTINUAL_EXISTING_PREFIX]) });
+                                    .prefix = as_opt<std::string>(rule[keywords::CONTINUAL_EXISTING_PREFIX]),
+                                    .required =
+                                        as_opt<bool>(rule[keywords::CONTINUAL_EXISTING_REQUIRED]).value_or(true) });
                             }
                             else if (const auto rule = continual_rule_type[keywords::CONTINUAL_LINEAR]) {
                                 nested.push_back(details::yaml::ConLinear{
@@ -165,7 +167,9 @@ std::optional<Config> dynser::config::from_string(const std::string_view sv) noe
                             if (const auto rule = branched_rule_type[keywords::BRANCHED_EXISTING]) {
                                 nested.rules.push_back(details::yaml::BraExisting{
                                     .tag = rule[keywords::BRANCHED_EXISTING_TAG].as<std::string>(),
-                                    .prefix = as_opt<std::string>(rule[keywords::BRANCHED_EXISTING_PREFIX]) });
+                                    .prefix = as_opt<std::string>(rule[keywords::BRANCHED_EXISTING_PREFIX]),
+                                    .required =
+                                        as_opt<bool>(rule[keywords::BRANCHED_EXISTING_REQUIRED]).value_or(true) });
                             }
                             else if (const auto rule = branched_rule_type[keywords::BRANCHED_LINEAR]) {
                                 nested.rules.push_back(details::yaml::BraLinear{
@@ -188,6 +192,8 @@ std::optional<Config> dynser::config::from_string(const std::string_view sv) noe
                                 nested.push_back(RecExisting{
                                     .tag = rule[keywords::RECURRENT_EXISTING_TAG].as<std::string>(),
                                     .prefix = rule[keywords::RECURRENT_EXISTING_PREFIX].as<std::string>(),
+                                    .required =
+                                        as_opt<bool>(rule[keywords::RECURRENT_EXISTING_REQUIRED]).value_or(true),
                                     .wrap = rule[keywords::RECURRENT_EXISTING_WRAP].as<bool>(),
                                     .default_value =
                                         as_opt<std::string>(rule[keywords::RECURRENT_EXISTING_DEFAULT_VALUE]),

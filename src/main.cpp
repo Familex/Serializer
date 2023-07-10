@@ -98,10 +98,11 @@ int main()
                     out = { from, to };
                 },
                 [](this auto const& self, dynser::Context& ctx, dynser::Properties&& props, std::vector<int>& out) {
-                    if (!props.contains("element"))
-                        return;
-                    out.push_back(props["element"].as_i32());
-                    self(ctx, dynser::util::remove_prefix(props, "next"), out);
+                    while (props.contains("element")) {
+                        out.push_back(props["element"].as_i32());
+                        props = dynser::util::remove_prefix(props, "next");
+                    }
+                    out.push_back(props["last-element"].as_i32());
                 },
             },
             // serialization
@@ -124,8 +125,8 @@ int main()
                 [](dynser::Context& ctx, const std::vector<int>& target) {
                     dynser::Properties result;
 
-                    for (std::size_t cnt{}; const auto& el : target) {
-                        auto val = dynser::PropertyValue{ el };
+                    for (std::size_t cnt{}, ind{}; ind < target.size() - 1; ++ind) {
+                        auto val = dynser::PropertyValue{ target[ind] };
                         dynser::Properties val_prop{ { "element", val } };
                         for (std::size_t i{}; i < cnt; ++i) {
                             val_prop = dynser::util::add_prefix(val_prop, "next");
@@ -133,6 +134,8 @@ int main()
                         result.merge(val_prop);
                         ++cnt;
                     }
+
+                    result["last-element"] = { target.back() };
 
                     return result;
                 } },

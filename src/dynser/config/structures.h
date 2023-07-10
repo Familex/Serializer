@@ -36,18 +36,21 @@ struct ConExisting
 {
     std::string tag;
     std::optional<std::string> prefix;
+    bool required;
 };
 
 struct BraExisting
 {
     std::string tag;
     std::optional<std::string> prefix;
+    bool required;
 };
 
 struct RecExisting
 {
     std::string tag;
     std::optional<std::string> prefix;
+    bool required;
 
     bool wrap;
     std::optional<std::string> default_value;

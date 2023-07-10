@@ -120,10 +120,12 @@ class DynSer
         return [&](const Existing& nested) noexcept -> dynser::SerializeResult {
             const auto inp = nested.prefix ? util::remove_prefix(props, *nested.prefix) : props;
             const auto serialize_result = this->serialize_props(inp, nested.tag);
-            if (!serialize_result) {
-                return nullopt;
+            if (!serialize_result && serialize_result.error() == SerializeError::ScriptVariableNotFound &&
+                !nested.required)
+            {
+                return ""; // recursion exit (maybe)
             }
-            return *serialize_result;
+            return serialize_result;
         };
     }
 
@@ -217,10 +219,6 @@ public:
                         gen_linear_process_helper<ConLinear>(props, fields)
                     );
                     if (!serialized_continual) {
-                        if (serialized_continual.error() == SerializeError::ScriptVariableNotFound) {
-                            // FIXME WRONG
-                            return "";
-                        }
                         return serialized_continual;
                     }
                     result += *serialized_continual;
