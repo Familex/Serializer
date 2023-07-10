@@ -82,7 +82,7 @@ details::regex::ToStringResult details::resolve_regex(const yaml::Regex& reg, co
     auto reg_sus = from_string(reg);
     if (!reg_sus) {
         return std::unexpected{ ToStringError{
-            ToStringErrorType::RegexSyntaxError,
+            to_string_err::RegexSyntaxError{ reg_sus.error() },
             0    // group number
         } };
     }

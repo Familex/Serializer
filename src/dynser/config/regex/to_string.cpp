@@ -113,7 +113,7 @@ details::regex::ToStringResult resolve_token(
                     return apply_quantifier(*result_sus, value.quantifier);
                 }
                 if (!vals.contains(value.number)) {
-                    return std::unexpected{ ToStringError{ ToStringErrorType::MissingValue, value.number } };
+                    return std::unexpected{ ToStringError{ to_string_err::MissingValue{}, value.number } };
                 }
                 std::string str_group_val = vals.at(value.number);
                 if (!std::regex_match(str_group_val, value.regex)) {
@@ -121,7 +121,7 @@ details::regex::ToStringResult resolve_token(
                         str_group_val = std::move(*appropriate_group_val);
                     }
                     else {
-                        return std::unexpected{ ToStringError{ ToStringErrorType::InvalidValue,
+                        return std::unexpected{ ToStringError{ to_string_err::InvalidValue{ str_group_val },
                                                                value.number } };    // can't fix wrong group val
                     }
                 }
@@ -133,7 +133,7 @@ details::regex::ToStringResult resolve_token(
                 if (cached_group_values.contains(value.group_number)) {
                     return apply_quantifier(cached_group_values.at(value.group_number), value.quantifier);
                 }
-                return std::unexpected{ ToStringError{ ToStringErrorType::MissingValue, value.group_number } };
+                return std::unexpected{ ToStringError{ to_string_err::MissingValue{}, value.group_number } };
             },
             [&](const Lookup& value) -> ToStringResult {
                 return resolve_regex(*value.value, vals, cached_group_values);
@@ -143,7 +143,7 @@ details::regex::ToStringResult resolve_token(
 
                 if (value.characters.empty()) {
                     return std::unexpected{ ToStringError{
-                        ToStringErrorType::InvalidValue,
+                        to_string_err::InvalidValue{ value.characters },
                         static_cast<std::size_t>(-1)    // FIXME Wrong way to handle errors
                     } };
                 }
@@ -157,7 +157,7 @@ details::regex::ToStringResult resolve_token(
                 }
                 if (value.characters.size() == 1) {
                     return std::unexpected{ ToStringError{
-                        ToStringErrorType::InvalidValue,
+                        to_string_err::InvalidValue{ value.characters },
                         static_cast<std::size_t>(-1)    // FIXME Wrong way to handle errors
                     } };
                 }
@@ -229,12 +229,11 @@ details::regex::ToStringResult resolve_regex(
             result += *str_sus;
         }
         else {
-            return std::unexpected{ str_sus.error() };
+            return str_sus;
         }
     }
     return result;
 }
-
 
 }    // namespace
 
@@ -243,4 +242,3 @@ details::regex::ToStringResult details::regex::to_string(const Regex& reg, const
     CachedGroupValues cached_group_values;    // for backreferences
     return ::resolve_regex(reg, vals, cached_group_values);
 }
-

@@ -47,14 +47,22 @@ int main()
                                   return std::format("script variable '{}' not set", error.variable_name);
                               },
                               [](const ResolveRegexError& error) -> std::string {
-                                  using enum dynser::config::details::regex::ToStringErrorType;
+                                  using namespace dynser::config::details::regex::to_string_err;
 
                                   return std::format(
                                       "regex error '{}' on group '{}'",
-                                      error.error.type == RegexSyntaxError ? "syntax error"
-                                      : error.error.type == MissingValue   ? "missing value"
-                                      : error.error.type == InvalidValue   ? "invalid value"
-                                                                           : "unknown error",
+                                      std::visit(
+                                          Overload{
+                                              [](const RegexSyntaxError& reg_err) -> std::string {
+                                                  return std::format("syntax error at {}", reg_err.position);
+                                              },
+                                              [](const MissingValue&) -> std::string { return "missing value"; },
+                                              [](const InvalidValue& reg_err) -> std::string {
+                                                  return std::format("invalid value: '{}'", reg_err.value);
+                                              },
+                                          },
+                                          error.error.error
+                                      ),
                                       error.error.group_num
                                   );
                               } },

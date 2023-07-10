@@ -1,23 +1,40 @@
 #pragma once
 
-#include "structures.h"
 #include "../structures.h"
+#include "structures.h"
 
 #include <expected>
+#include <variant>
 
 namespace dynser::config::details::regex
 {
 
-enum class ToStringErrorType {
-    RegexSyntaxError,    /// group regex syntax error
-    MissingValue,        /// value with current group num not found
-    InvalidValue,        /// group regex missmatched
+namespace to_string_err
+{
+
+struct RegexSyntaxError
+{
+    std::size_t position{};
 };
+
+struct MissingValue
+{ };
+
+struct InvalidValue
+{
+    std::string value;
+};
+
+}    // namespace to_string_err
 
 struct ToStringError
 {
-    ToStringErrorType type;
-    std::size_t group_num;    // wrong field arrangement
+    std::variant<
+        to_string_err::RegexSyntaxError,    //
+        to_string_err::MissingValue,
+        to_string_err::InvalidValue>
+        error;
+    std::size_t group_num{};
 };
 
 using ToStringResult = std::expected<std::string, ToStringError>;
