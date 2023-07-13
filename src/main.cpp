@@ -118,11 +118,12 @@ int main()
         */
 
         const auto bar_to_prop = [](dynser::Context&, const Bar& target) {
-            return dynser::Properties{ { "is-left", { target.is_left } } };
+            return dynser::Properties{ { "is-left", dynser::PropertyValue{ target.is_left } } };
         };
 
         const auto pos_to_prop = [](dynser::Context&, const Pos& target) {
-            return dynser::Properties{ { "x", { target.x } }, { "y", { target.y } } };
+            return dynser::Properties{ { "x", dynser::PropertyValue{ target.x } },
+                                       { "y", dynser::PropertyValue{ target.y } } };
         };
 
         const auto prop_to_bar = [](dynser::Context&, dynser::Properties&& props, Bar& out) {
@@ -130,7 +131,7 @@ int main()
         };
 
         const auto prop_to_pos = [](dynser::Context&, dynser::Properties&& props, Pos& out) {
-            out = { any_cast<std::int32_t>(props["x"].data), any_cast<std::int32_t>(props["y"].data) };
+            out = { props["x"].as_i32(), props["y"].as_i32() };
         };
 
         dynser::DynSer ser{
@@ -140,9 +141,7 @@ int main()
                 [&prop_to_bar](dynser::Context& ctx, dynser::Properties&& props, Foo& out) {
                     Bar bar;
                     prop_to_bar(ctx, dynser::Properties{ props }, bar);
-                    out = { bar,
-                            std::any_cast<std::int32_t>(props["dot-stopped"].data),
-                            std::any_cast<std::int32_t>(props["len-stopped"].data) };
+                    out = { bar, props["dot-stopped"].as_i32(), props["len-stopped"].as_i32() };
                 },
                 [](dynser::Context&, dynser::Properties&& props, Baz& out) { out = { props["letter"].as_string() }; },
                 prop_to_pos,
@@ -166,12 +165,12 @@ int main()
                 bar_to_prop,
                 [&bar_to_prop](dynser::Context& ctx, const Foo& target) {
                     return bar_to_prop(ctx, target.bar) + dynser::Properties{
-                        { "dot-stopped", { target.dot } },
-                        { "len-stopped", { target.dyn } },
+                        { "dot-stopped", dynser::PropertyValue{ target.dot } },
+                        { "len-stopped", dynser::PropertyValue{ target.dyn } },
                     };
                 },
                 [](dynser::Context&, const Baz& target) {
-                    return dynser::Properties{ { "letter", { target.letter } } };
+                    return dynser::Properties{ { "letter", dynser::PropertyValue{ target.letter } } };
                 },
                 pos_to_prop,
                 [&pos_to_prop](dynser::Context& ctx, const Input& target) {
@@ -191,7 +190,7 @@ int main()
                         ++cnt;
                     }
 
-                    result["last-element"] = { target.back() };
+                    result["last-element"] = dynser::PropertyValue{ target.back() };
 
                     return result;
                 } },
@@ -215,8 +214,8 @@ int main()
             return target == *deserialize_result;
         };
 
-        ser.context["val-length"] = { std::make_any<std::string>("4") };
-        ser.context["type"] = { std::make_any<std::string>("a") };
+        ser.context["val-length"] = dynser::PropertyValue{ "4" };
+        ser.context["type"] = dynser::PropertyValue{ "a" };
 
         std::size_t res{};
         res += round_trip(foo, "foo");

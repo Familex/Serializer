@@ -3,6 +3,7 @@
 #include "luwra.hpp"
 
 #include <any>
+#include <cassert>
 #include <map>
 #include <string>
 
@@ -10,92 +11,153 @@ namespace dynser
 {
 
 /**
+ * \brief Named parts of type, what can be converted and projected to string.
+ * \note luwra's register_user_type can't receive std::unoredered_maps.
+ */
+using Properties = std::map<std::string, struct PropertyValue>;
+
+/**
  * \brief Property value type, can be used in lua.
+ * std::any wrapper with constant type.
  */
 struct PropertyValue
 {
-    std::any data;
+private:
+    std::any data_;
 
-    // const
+public:
+    using FloatType = double;
+    using CharType = char;
+    using StringType = std::string;
+    using MapKeyType = std::string;
+    template <typename T>
+    using ListType = std::vector<T>;
 
-    inline decltype(auto) as_const_i32() const { return std::any_cast<const std::int32_t&>(data); }
+    // ========================================================================
+    // ===                           CONSTRUCTORS                           ===
+    // ========================================================================
 
-    inline decltype(auto) as_const_i64() const { return std::any_cast<const std::int64_t&>(data); }
+    explicit PropertyValue() noexcept
+      : data_{}
+    { }
 
-    inline decltype(auto) as_const_u32() const { return std::any_cast<const std::uint32_t&>(data); }
+    // trivial one-argument ctor macro
+#define DYNSER_POPULATE_PROPERTY_VALUE(type)                                                                           \
+    explicit PropertyValue(type value) noexcept                                                                        \
+      : data_{ value }                                                                                                 \
+    { }
 
-    inline decltype(auto) as_const_u64() const { return std::any_cast<const std::uint64_t&>(data); }
+    DYNSER_POPULATE_PROPERTY_VALUE(std::int32_t)
+    DYNSER_POPULATE_PROPERTY_VALUE(std::int64_t)
+    DYNSER_POPULATE_PROPERTY_VALUE(std::uint32_t)
+    DYNSER_POPULATE_PROPERTY_VALUE(std::uint64_t)
+    DYNSER_POPULATE_PROPERTY_VALUE(FloatType)
+    DYNSER_POPULATE_PROPERTY_VALUE(StringType)
 
-    inline decltype(auto) as_const_float() const { return std::any_cast<const double&>(data); }
+    // construct from string literal
+    explicit PropertyValue(CharType const* value) noexcept
+      : data_{ StringType{ value } }
+    { }
 
-    inline decltype(auto) as_const_string() const { return std::any_cast<const std::string&>(data); }
+    DYNSER_POPULATE_PROPERTY_VALUE(bool)
+    DYNSER_POPULATE_PROPERTY_VALUE(CharType)
+    DYNSER_POPULATE_PROPERTY_VALUE(ListType<PropertyValue>)
+    DYNSER_POPULATE_PROPERTY_VALUE(Properties)
 
-    inline decltype(auto) as_const_bool() const { return std::any_cast<const bool&>(data); }
+#undef DYNSER_POPULATE_PROPERTY_VALUE
 
-    inline decltype(auto) as_const_char() const { return std::any_cast<const char&>(data); }
+    // ========================================================================
+    // ===                           'IS' method                            ===
+    // ========================================================================
 
-    inline decltype(auto) as_const_list() const { return std::any_cast<const std::vector<PropertyValue>&>(data); }
-
-    inline decltype(auto) as_const_map() const
+private:
+    // base method
+    template <typename T>
+    inline decltype(auto) is() const noexcept
     {
-        return std::any_cast<const std::map<std::string, PropertyValue>&>(data);
+        return typeid(T) == data_.type();
     }
 
-    // not-const
+public:
+    // FIXME LUWRA_MEMBER can't receive noexcept methods
+#define DYNSER_POPULATE_IS(name, type)                                                                                 \
+    inline decltype(auto) name() const { return is<type>(); }
 
-    inline decltype(auto) as_i32() { return std::any_cast<const std::int32_t&>(data); }
+    DYNSER_POPULATE_IS(is_i32, std::int32_t)
+    DYNSER_POPULATE_IS(is_i64, std::int64_t)
+    DYNSER_POPULATE_IS(is_u32, std::uint32_t)
+    DYNSER_POPULATE_IS(is_u64, std::uint64_t)
+    DYNSER_POPULATE_IS(is_float, FloatType)
+    DYNSER_POPULATE_IS(is_string, StringType)
+    DYNSER_POPULATE_IS(is_bool, bool)
+    DYNSER_POPULATE_IS(is_char, CharType)
+    DYNSER_POPULATE_IS(is_list, ListType<PropertyValue>)
+    DYNSER_POPULATE_IS(is_map, Properties)
 
-    inline decltype(auto) as_i64() { return std::any_cast<const std::int64_t&>(data); }
+#undef DYNSER_POPULATE_IS
 
-    inline decltype(auto) as_u32() { return std::any_cast<const std::uint32_t&>(data); }
+    // ========================================================================
+    // ===                       'AS_CONST' method                          ===
+    // ========================================================================
 
-    inline decltype(auto) as_u64() { return std::any_cast<const std::uint64_t&>(data); }
-
-    inline decltype(auto) as_float() { return std::any_cast<const double&>(data); }
-
-    inline decltype(auto) as_string() { return std::any_cast<const std::string&>(data); }
-
-    inline decltype(auto) as_bool() { return std::any_cast<const bool&>(data); }
-
-    inline decltype(auto) as_char() { return std::any_cast<const char&>(data); }
-
-    inline decltype(auto) as_list() { return std::any_cast<const std::vector<PropertyValue>&>(data); }
-
-    inline decltype(auto) as_map() { return std::any_cast<const std::map<std::string, PropertyValue>&>(data); }
-
-    // is
-
-    inline decltype(auto) is_i32() const { return typeid(std::int32_t) == (data.type()); }
-
-    inline decltype(auto) is_i64() const { return typeid(std::int64_t) == (data.type()); }
-
-    inline decltype(auto) is_u32() const { return typeid(std::uint32_t) == (data.type()); }
-
-    inline decltype(auto) is_u64() const { return typeid(std::uint64_t) == (data.type()); }
-
-    inline decltype(auto) is_float() const { return typeid(double) == (data.type()); }
-
-    inline decltype(auto) is_string() const { return typeid(std::string) == (data.type()); }
-
-    inline decltype(auto) is_bool() const { return typeid(bool) == (data.type()); }
-
-    inline decltype(auto) is_char() const { return typeid(char) == (data.type()); }
-
-    inline decltype(auto) is_list() const { return typeid(std::vector<PropertyValue>) == (data.type()); }
-
-    inline decltype(auto) is_map() const { return typeid(std::map<std::string, PropertyValue>) == (data.type()); }
-
-    template <typename Type>
-    inline decltype(auto) is() const
+private:
+    // base method
+    // get data copy from const object instances
+    template <typename T>
+    inline decltype(auto) as_const() const
     {
-        return typeid(Type) == (data.type());
+        assert(is<T>());    // FIXME make out parameter optional?
+        return std::any_cast<const T&>(data_);
     }
+
+public:
+#define DYNSER_POPULATE_AS_CONST(name, raw_type)                                                                       \
+    inline decltype(auto) name() const { return as_const<raw_type>(); }
+
+    DYNSER_POPULATE_AS_CONST(as_const_i32, std::int32_t)
+    DYNSER_POPULATE_AS_CONST(as_const_i64, std::int64_t)
+    DYNSER_POPULATE_AS_CONST(as_const_u32, std::uint32_t)
+    DYNSER_POPULATE_AS_CONST(as_const_u64, std::uint64_t)
+    DYNSER_POPULATE_AS_CONST(as_const_float, FloatType)
+    DYNSER_POPULATE_AS_CONST(as_const_string, StringType)
+    DYNSER_POPULATE_AS_CONST(as_const_bool, bool)
+    DYNSER_POPULATE_AS_CONST(as_const_char, CharType)
+    DYNSER_POPULATE_AS_CONST(as_const_list, ListType<PropertyValue>)
+    DYNSER_POPULATE_AS_CONST(as_const_map, Properties)
+
+#undef DYNSER_POPULATE_AS_CONST
+
+    // ========================================================================
+    // ===                           'AS' method                            ===
+    // ========================================================================
+
+private:
+    // base method
+    // modify data of object instance
+    template <typename T>
+    inline decltype(auto) as()
+    {
+        assert(is<T>());    // FIXME make out parameter optional?
+        return std::any_cast<T&>(data_);
+    }
+
+public:
+#define DYNSER_POPULATE_AS(name, raw_type)                                                                             \
+    inline decltype(auto) name() { return as<raw_type>(); }
+
+    DYNSER_POPULATE_AS(as_i32, std::int32_t)
+    DYNSER_POPULATE_AS(as_i64, std::int64_t)
+    DYNSER_POPULATE_AS(as_u32, std::uint32_t)
+    DYNSER_POPULATE_AS(as_u64, std::uint64_t)
+    DYNSER_POPULATE_AS(as_float, FloatType)
+    DYNSER_POPULATE_AS(as_string, StringType)
+    DYNSER_POPULATE_AS(as_bool, bool)
+    DYNSER_POPULATE_AS(as_char, CharType)
+    DYNSER_POPULATE_AS(as_list, ListType<PropertyValue>)
+    DYNSER_POPULATE_AS(as_map, Properties)
+
+#undef DYNSER_POPULATE_AS
 };
-
-/**
- * \brief Named parts of type, what can be converted and projected to string.
- */
-using Properties = std::map<std::string, PropertyValue>;
 
 Properties operator+(Properties&& lhs, Properties&& rhs) noexcept
 {

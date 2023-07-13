@@ -149,7 +149,7 @@ Fields props_to_fields(const Properties& props) noexcept
 {
     Fields result;
     for (const auto& [key, val] : props) {
-        if (val.is<std::string>()) {
+        if (val.is_string()) {
             result[key] = val.as_const_string();
         }
     }
@@ -195,7 +195,7 @@ class DynSer
                 return "";    // can be used as recursion exit
             }
 
-            return serialize_result; // pass through
+            return serialize_result;    // pass through
         };
     }
 
