@@ -42,7 +42,6 @@ download_project (
     UPDATE_DISCONNECTED 1
 )
 add_subdirectory (${lua_cmake_SOURCE_DIR} ${lua_cmake_BINARY_DIR})
-include_directories ("${lua_cmake_SOURCE_DIR}/lua-5.4.5/src")
 
 # luwra (header-only)
 download_project (
