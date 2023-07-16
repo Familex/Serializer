@@ -81,7 +81,7 @@ private:
 public:
     // FIXME LUWRA_MEMBER can't receive noexcept methods
 #define DYNSER_POPULATE_IS(name, type)                                                                                 \
-    inline decltype(auto) name() const { return is<type>(); }
+    inline decltype(auto) name() const { return is<type>(); } // FIXME use noexcept
 
     DYNSER_POPULATE_IS(is_i32, std::int32_t)
     DYNSER_POPULATE_IS(is_i64, std::int64_t)

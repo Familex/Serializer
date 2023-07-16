@@ -63,6 +63,16 @@ add_subdirectory (${yaml_cpp_SOURCE_DIR} ${yaml_cpp_BINARY_DIR})
 include_directories ("${yaml_cpp_SOURCE_DIR}/include")
 
 #######################################
+# Flags
+#######################################
+
+# from https://stackoverflow.com/a/60890947
+# to define __cplusplus correctly for MSVC
+if ((MSVC) AND (MSVC_VERSION GREATER_EQUAL 1914))
+    target_compile_options(dynser PUBLIC "/Zc:__cplusplus") # FIXME can be INTERFACE?
+endif()
+
+#######################################
 # Link
 #######################################
 
