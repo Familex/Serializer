@@ -191,12 +191,14 @@ std::optional<Config> dynser::config::from_string(const std::string_view sv) noe
                             if (const auto rule = recurrent_rule_type[keywords::RECURRENT_EXISTING]) {
                                 nested.push_back(RecExisting{
                                     .tag = rule[keywords::RECURRENT_EXISTING_TAG].as<std::string>(),
-                                    .prefix = rule[keywords::RECURRENT_EXISTING_PREFIX].as<std::string>(),
+                                    .prefix = as_opt<std::string>(rule[keywords::RECURRENT_EXISTING_PREFIX]),
                                     .required =
                                         as_opt<bool>(rule[keywords::RECURRENT_EXISTING_REQUIRED]).value_or(true),
-                                    .wrap = rule[keywords::RECURRENT_EXISTING_WRAP].as<bool>(),
+                                    .wrap = as_opt<bool>(rule[keywords::RECURRENT_EXISTING_WRAP]).value_or(false),
                                     .default_value =
                                         as_opt<std::string>(rule[keywords::RECURRENT_EXISTING_DEFAULT_VALUE]),
+                                    .priority =
+                                        as_opt<PriorityType>(rule[keywords::RECURRENT_EXISTING_PRIORITY]).value_or(0),
                                 });
                             }
                             else if (const auto rule = recurrent_rule_type[keywords::RECURRENT_LINEAR]) {
@@ -207,14 +209,23 @@ std::optional<Config> dynser::config::from_string(const std::string_view sv) noe
                                     ),
                                     .fields =
                                         as_opt<details::yaml::GroupValues>(rule[keywords::RECURRENT_LINEAR_FIELDS]),
-                                    .wrap = rule[keywords::RECURRENT_LINEAR_WRAP].as<bool>(),
+                                    .wrap = as_opt<bool>(rule[keywords::RECURRENT_LINEAR_WRAP]).value_or(false),
                                     .default_value =
                                         as_opt<std::string>(rule[keywords::RECURRENT_LINEAR_DEFAULT_VALUE]),
+                                    .priority =
+                                        as_opt<PriorityType>(rule[keywords::RECURRENT_LINEAR_PRIORITY]).value_or(0),
                                 });
                             }
                             else if (const auto rule = recurrent_rule_type[keywords::RECURRENT_INFIX]) {
                                 nested.push_back(RecInfix{
                                     .pattern = rule[keywords::RECURRENT_INFIX_PATTERN].as<std::string>(),
+                                    .dyn_groups =
+                                        as_opt<details::yaml::DynGroupValues>(rule[keywords::RECURRENT_INFIX_DYN_GROUPS]
+                                        ),
+                                    .fields =
+                                        as_opt<details::yaml::GroupValues>(rule[keywords::RECURRENT_INFIX_FIELDS]),
+                                    .wrap = as_opt<bool>(rule[keywords::RECURRENT_INFIX_WRAP]).value_or(false),
+                                    .default_value = as_opt<std::string>(rule[keywords::RECURRENT_INFIX_DEFAULT_VALUE]),
                                 });
                             }
                         }

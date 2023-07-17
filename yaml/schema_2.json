@@ -59,6 +59,10 @@
       "default": {
         "type": "string",
         "description": "default value on of bounds element request"
+      },
+      "priority": {
+        "type": "string",
+        "description": "priority of list field in max length calculation, the higher value - the higher priority"
       }
     }
   },
@@ -181,6 +185,9 @@
                     },
                     "default": {
                       "$ref": "#/definitions/recurrent/default"
+                    },
+                    "priority": {
+                      "$ref": "#/definitions/recurrent/priority"
                     }
                   }
                 },
@@ -205,6 +212,9 @@
                     },
                     "default": {
                       "$ref": "#/definitions/recurrent/default"
+                    },
+                    "priority": {
+                      "$ref": "#/definitions/recurrent/priority"
                     }
                   }
                 },
@@ -217,6 +227,18 @@
                   "properties": {
                     "pattern": {
                       "$ref": "#/definitions/field-pattern"
+                    },
+                    "fields": {
+                      "$ref": "#/definitions/linear/fields"
+                    },
+                    "dyn-groups": {
+                      "$ref": "#/definitions/linear/dyn-groups"
+                    },
+                    "wrap": {
+                      "$ref": "#/definitions/recurrent/wrap"
+                    },
+                    "default": {
+                      "$ref": "#/definitions/recurrent/default"
                     }
                   }
                 }

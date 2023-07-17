@@ -6,6 +6,7 @@
 #include <cassert>
 #include <format>
 #include <iostream>
+#include <ranges>
 #include <regex>
 
 template <typename... Fs>
@@ -159,7 +160,9 @@ int main()
                     }
                     out.push_back(last_element);
                 },
-            },
+                [](dynser::Context&, dynser::Properties&& props, std::vector<Pos>& out) {
+                    std::unreachable();    // not implemented
+                } },
             // serialization
             dynser::TargetToPropertyMapper{
                 bar_to_prop,
@@ -193,7 +196,22 @@ int main()
                     result["last-element"] = dynser::PropertyValue{ target.back() };
 
                     return result;
-                } },
+                },
+                [](dynser::Context&, const std::vector<Pos>& target) -> dynser::Properties {
+                    using List = dynser::PropertyValue::ListType<dynser::PropertyValue>;
+
+                    dynser::Properties result;
+
+                    result["x"] = dynser::PropertyValue{ List{} };
+                    result["y"] = dynser::PropertyValue{ List{} };
+                    for (const auto& el : target) {
+                        result["x"].as_list().push_back(dynser::PropertyValue{ el.x });
+                        result["y"].as_list().push_back(dynser::PropertyValue{ el.y });
+                    }
+
+                    return result;
+                },
+            }
         };
         const auto load_result = ser.load_config(dynser::config::FileName{ "./yaml/example2.yaml" });
 
@@ -247,8 +265,8 @@ int main()
         using namespace dynser::config::details::regex;
 
         /*
-        const std::optional<Quantifier> test[]{ search_quantifier("?[abs]{3,4}"), search_quantifier("*[futnntusrnay"),
-                                                search_quantifier("{1,2}"),       search_quantifier("{1}"),
+        const std::optional<Quantifier> test[]{ search_quantifier("?[abs]{3,4}"),
+        search_quantifier("*[futnntusrnay"), search_quantifier("{1,2}"),       search_quantifier("{1}"),
                                                 search_quantifier("{1,}"),        search_quantifier("{1}?"),
                                                 search_quantifier("{10,}?"),      search_quantifier("+?ft") };
                                                 */

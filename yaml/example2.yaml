@@ -72,6 +72,7 @@ tags:
     deserialization-script: |
       out['x'] = tonumber(inp['x'])
       out['y'] = tonumber(inp['y'])
+
   - name: "input"
     continual:
       - linear:
@@ -87,7 +88,6 @@ tags:
       - linear:
           pattern: '\)'
 
-  # experimental
   - name: "recursive"
     continual:
       - linear: { pattern: '\[ ' }
@@ -110,4 +110,14 @@ tags:
     deserialization-script: |
       -- recursion exit?
       out['element'] = tonumber(inp['element'])
+
+  - name: "pos-list"
+    continual:
+      - linear: { pattern: "[ " }
+      - existing: { tag: "pos-list-payload" }
+      - linear: { pattern: " ]" }
+  - name: "pos-list-payload"
+    recurrent:
+      - existing: { tag: "pos" }
+      - infix: { pattern: ", " }
 ...

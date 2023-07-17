@@ -22,6 +22,8 @@ struct RawContents
 
 namespace details::yaml
 {
+    using PriorityType = std::int32_t;
+
 using Regex = std::string;
 
 using DynRegex = std::string;
@@ -54,6 +56,7 @@ struct RecExisting
 
     bool wrap;
     std::optional<std::string> default_value;
+    PriorityType priority;
 };
 
 struct ConLinear
@@ -78,11 +81,17 @@ struct RecLinear
 
     bool wrap;
     std::optional<std::string> default_value;
+    PriorityType priority;
 };
 
 struct RecInfix
 {
     details::yaml::Regex pattern;
+    std::optional<DynGroupValues> dyn_groups;
+    std::optional<GroupValues> fields;
+
+    bool wrap;
+    std::optional<std::string> default_value;
 };
 
 using Continual = std::vector<std::variant<ConExisting, ConLinear>>;
