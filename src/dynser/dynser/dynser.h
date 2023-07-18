@@ -156,6 +156,57 @@ Fields props_to_fields(const Properties& props) noexcept
     return result;
 }
 
+using PrioritizedListLen = std::pair<config::details::yaml::PriorityType, std::size_t>;
+
+std::optional<PrioritizedListLen> calc_max_property_lists_len_helper(
+    config::Config const& config,
+    Properties const& props,
+    config::details::yaml::LikeExisting auto const& rule
+) noexcept
+{
+    // FIXME
+    return {};
+}
+
+std::optional<PrioritizedListLen> calc_max_property_lists_len_helper(
+    config::Config const& config,
+    Properties const& props,
+    config::details::yaml::LikeLinear auto const& rule
+) noexcept
+{
+    // FIXME
+    return {};
+}
+
+std::optional<std::size_t> calc_max_property_lists_len(
+    config::Config const& config,
+    Properties const& props,
+    config::details::yaml::Recurrent const& rules
+) noexcept
+{
+    std::optional<PrioritizedListLen> result{ std::nullopt };
+
+    for (const auto& rule_v : rules) {
+        const auto rule_result = std::visit(
+            [&config, &props](auto const& rule) {    //
+                return calc_max_property_lists_len_helper(config, props, rule);
+            },
+            rule_v
+        );
+
+        if (rule_result) {
+            if (!result ||                               //
+                rule_result->first > result->first ||    //
+                rule_result->first == result->first && rule_result->second > result->second)
+            {
+                result = *rule_result;
+            }
+        }
+    }
+
+    return !result ? std::optional<std::size_t>{} : std::optional<std::size_t>{ result->second };
+}
+
 }    // namespace details
 
 /**
@@ -344,7 +395,32 @@ public:
             [&](const Recurrent& recurrent) -> SerializeResult {
                 std::string result;
 
-                // FIXME
+                // max length of property lists
+                const auto max_len = dynser::details::calc_max_property_lists_len(*config_, props, recurrent);
+
+                for (std::size_t ind{}; ind < max_len; ++ind) {
+                    for (const auto& recurrent_rule : recurrent) {    // FIXME add as_list stuff
+                        const auto serialized_recurrent = util::visit_one(
+                            recurrent_rule,
+                            [&](const RecExisting& dymmy) -> SerializeResult {
+                                // FIXME
+                                return {};
+                            },
+                            [&](const RecLinear& dymmy) -> SerializeResult {
+                                // FIXME
+                                return {};
+                            },
+                            [&](const RecInfix& dymmy) -> SerializeResult {
+                                // FIXME
+                                return {};
+                            }
+                        );
+                        if (!serialized_recurrent) {
+                            return serialized_recurrent;
+                        }
+                        result += *serialized_recurrent;
+                    }
+                }
 
                 return result;
             }

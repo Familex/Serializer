@@ -22,7 +22,7 @@ struct RawContents
 
 namespace details::yaml
 {
-    using PriorityType = std::int32_t;
+using PriorityType = std::int32_t;
 
 using Regex = std::string;
 
@@ -118,6 +118,23 @@ struct Tag
 };
 
 using Tags = std::unordered_map<std::string, Tag>;
+
+template <typename Rule>
+concept LikeExisting = requires(Rule rule) {
+    {
+        rule.tag
+    } -> std::same_as<std::string&>;
+};
+
+template <typename Rule>
+concept LikeLinear = requires(Rule rule) {
+    {
+        rule.pattern
+    } -> std::same_as<details::yaml::Regex&>;
+    {
+        rule.fields
+    } -> std::same_as<std::optional<GroupValues>&>;
+};
 
 }    // namespace details::yaml
 
