@@ -61,7 +61,7 @@
         "description": "default value on of bounds element request"
       },
       "priority": {
-        "type": "string",
+        "type": "integer",
         "description": "priority of list field in max length calculation, the higher value - the higher priority"
       }
     }

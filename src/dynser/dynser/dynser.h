@@ -158,53 +158,117 @@ Fields props_to_fields(const Properties& props) noexcept
 
 using PrioritizedListLen = std::pair<config::details::yaml::PriorityType, std::size_t>;
 
+// forward declaration
+std::optional<PrioritizedListLen>
+calc_max_property_lists_len(config::Config const&, Properties const&, config::details::yaml::Nested const&) noexcept;
+
+// for existing and linear rules
 std::optional<PrioritizedListLen> calc_max_property_lists_len_helper(
     config::Config const& config,
     Properties const& props,
     config::details::yaml::LikeExisting auto const& rule
 ) noexcept
 {
-    // FIXME
-    return {};
+    using namespace config::details::yaml;
+
+    auto result = calc_max_property_lists_len(config, props, config.tags.at(rule.tag).nested);
+
+    if constexpr (HasPriority<decltype(rule)>) {
+        if (result) {
+            result->first = rule.priority;
+        }
+    }
+    return result;
 }
 
+// for existing and linear rules (
 std::optional<PrioritizedListLen> calc_max_property_lists_len_helper(
     config::Config const& config,
     Properties const& props,
     config::details::yaml::LikeLinear auto const& rule
 ) noexcept
 {
-    // FIXME
-    return {};
-}
+    using namespace config::details::yaml;
 
-std::optional<std::size_t> calc_max_property_lists_len(
-    config::Config const& config,
-    Properties const& props,
-    config::details::yaml::Recurrent const& rules
-) noexcept
-{
-    std::optional<PrioritizedListLen> result{ std::nullopt };
+    std::optional<std::size_t> result{ std::nullopt };
 
-    for (const auto& rule_v : rules) {
-        const auto rule_result = std::visit(
-            [&config, &props](auto const& rule) {    //
-                return calc_max_property_lists_len_helper(config, props, rule);
-            },
-            rule_v
-        );
+    if (!rule.fields) {
+        return result ? std::optional<PrioritizedListLen>{ { 0, *result } } : std::optional<PrioritizedListLen>{};
+    }
 
-        if (rule_result) {
-            if (!result ||                               //
-                rule_result->first > result->first ||    //
-                rule_result->first == result->first && rule_result->second > result->second)
-            {
-                result = *rule_result;
-            }
+    for (auto const& [group_num, field_name] : *rule.fields) {
+        if (!props.contains(field_name)) {
+            continue;
+        }
+
+        const auto& list_prop_sus = props.at(field_name);
+
+        if (!list_prop_sus.is_list()) {
+            continue;
+        }
+
+        const auto list_len = list_prop_sus.as_const_list().size();
+
+        if (!result || *result < list_len) {
+            result = list_len;
         }
     }
 
-    return !result ? std::optional<std::size_t>{} : std::optional<std::size_t>{ result->second };
+    std::optional<PrioritizedListLen> result_prioritized                  //
+        { result ? std::optional<PrioritizedListLen>{ { 0, *result } }    //
+                 : std::optional<PrioritizedListLen>{} };
+
+    if constexpr (HasPriority<decltype(rule)>) {
+        if (result_prioritized) {
+            result_prioritized->first = rule.priority;
+        }
+    }
+
+    return result_prioritized;
+}
+
+std::optional<PrioritizedListLen> calc_max_property_lists_len(
+    config::Config const& config,
+    Properties const& props,
+    config::details::yaml::Nested const& rules
+) noexcept
+{
+    using namespace config::details::yaml;
+
+    std::optional<PrioritizedListLen> result{ std::nullopt };
+
+    const auto visit_vector_of_existing_or_linear_rules =    //
+        [&config, &props, &result](auto const& vector_of_existing_or_linear_rules) {
+            for (const auto& rule_v : vector_of_existing_or_linear_rules) {
+                const auto rule_result = std::visit(
+                    [&config, &props](auto const& rule) {    //
+                        return calc_max_property_lists_len_helper(config, props, rule);
+                    },
+                    rule_v
+                );
+
+                if (rule_result) {
+                    if (!result ||                               //
+                        rule_result->first > result->first ||    //
+                        rule_result->first == result->first && rule_result->second > result->second)
+                    {
+                        result = *rule_result;
+                    }
+                }
+            }
+        };
+
+    util::visit_one(
+        rules,
+        [&](Branched const& branched) {    //
+            visit_vector_of_existing_or_linear_rules(branched.rules);
+        },
+        [&](auto const& vector_of_existing_or_linear_rules) {
+            visit_vector_of_existing_or_linear_rules(vector_of_existing_or_linear_rules);
+        }
+    );
+
+    return result;
 }
 
 }    // namespace details
@@ -396,7 +460,8 @@ public:
                 std::string result;
 
                 // max length of property lists
-                const auto max_len = dynser::details::calc_max_property_lists_len(*config_, props, recurrent);
+                // FIXME remove unwrap
+                const auto max_len = dynser::details::calc_max_property_lists_len(*config_, props, recurrent)->second;
 
                 for (std::size_t ind{}; ind < max_len; ++ind) {
                     for (const auto& recurrent_rule : recurrent) {    // FIXME add as_list stuff

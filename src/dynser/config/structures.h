@@ -120,20 +120,27 @@ struct Tag
 using Tags = std::unordered_map<std::string, Tag>;
 
 template <typename Rule>
-concept LikeExisting = requires(Rule rule) {
+concept HasPriority = requires(Rule const rule) {
     {
-        rule.tag
-    } -> std::same_as<std::string&>;
+        rule.priority
+    } -> std::same_as<PriorityType const&>;
 };
 
 template <typename Rule>
-concept LikeLinear = requires(Rule rule) {
+concept LikeExisting = requires(Rule const rule) {
+    {
+        rule.tag
+    } -> std::same_as<std::string const&>;
+};
+
+template <typename Rule>
+concept LikeLinear = requires(Rule const rule) {
     {
         rule.pattern
-    } -> std::same_as<details::yaml::Regex&>;
+    } -> std::same_as<details::yaml::Regex const&>;
     {
         rule.fields
-    } -> std::same_as<std::optional<GroupValues>&>;
+    } -> std::same_as<std::optional<GroupValues> const&>;
 };
 
 }    // namespace details::yaml

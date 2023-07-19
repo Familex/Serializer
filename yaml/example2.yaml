@@ -118,6 +118,6 @@ tags:
       - linear: { pattern: " ]" }
   - name: "pos-list-payload"
     recurrent:
-      - existing: { tag: "pos" }
+      - existing: { tag: "pos", priority: 1 }
       - infix: { pattern: ", " }
 ...

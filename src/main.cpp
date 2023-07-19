@@ -17,7 +17,7 @@ struct Overload : Fs...
 
 int main()
 {
-    if constexpr (true) {
+    if constexpr (false) {
         struct Printer
         {
             std::string serialize_err_to_string(dynser::SerializeError const& wrapper) noexcept
@@ -418,6 +418,43 @@ int main()
                 continue;
             }
             std::cout << "result '" << *t << "'\n";
+        }
+    }
+
+    if constexpr (true) {
+        using namespace dynser::config;
+        using namespace dynser::details;
+        using dynser::Properties;
+        using PV = dynser::PropertyValue;
+        using Lst = PV::ListType<PV>;
+
+        const auto result_as_string = [](const auto& result) -> std::string {
+            if (!result) {
+                return "nullopt";
+            }
+            return std::format("priority: '{}', value: '{}'", result->first, result->second);
+        };
+
+        std::fstream config_file{ "./yaml/example2.yaml" };
+        std::stringstream buffer;
+        buffer << config_file.rdbuf();
+
+        Config config{ *from_string(buffer.str()) };
+
+        const std::optional<PrioritizedListLen> results[]{
+            calc_max_property_lists_len(
+                config,
+                Properties{
+                    //
+                    { "x", PV{ Lst{ PV{ 1 }, PV{ 2 }, PV{ 3 } } } },
+                    { "y", PV{ Lst{} } },    //
+                },
+                config.tags.at("pos-list-payload").nested
+            ),
+        };
+
+        for (const auto& result : results) {
+            std::cout << result_as_string(result) << std::endl;
         }
     }
 }
