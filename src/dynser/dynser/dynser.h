@@ -296,7 +296,7 @@ class DynSer
         return from_file(config::RawContents(buffer.str()));
     }
 
-    // share 'existing' serialize between continual and branched
+    // share 'existing' serialize between continual, branched and recurrent
     template <typename Existing>
     auto gen_existing_process_helper(const auto& props, const auto& after_script_fields) noexcept
     {
@@ -314,7 +314,7 @@ class DynSer
         };
     }
 
-    // share 'linear' serialize between continual and branched
+    // share 'linear' serialize between continual, branched and recurrent
     template <typename Linear>
     auto gen_linear_process_helper(const auto& props, const auto& after_script_fields) noexcept
     {
@@ -373,24 +373,76 @@ public:
         using namespace config::details::yaml;
         using namespace config;
 
-        // properies to fields
+        // input: { 'a': 0, 'b': [ 1, 2, 3 ] }
+        // output: ( { 'a': 0 }, [ { 'b': 1 }, { 'b': 2 }, { 'b': 3 } ] )
+        const auto [non_list_props, unflattened_props_vector] =
+            [](Properties const& props) -> std::pair<Properties, std::vector<Properties>> {    // iife
+            std::vector<Properties> unflattened_props;
+            Properties non_list_props;
+
+            for (auto const& [key, prop_val] : props) {
+                if (prop_val.is_list()) {
+                    const auto size = prop_val.as_const_list().size();
+
+                    if (unflattened_props.size() < size) {
+                        unflattened_props.resize(size);
+                    }
+                    for (std::size_t ind{}; auto const& el : prop_val.as_const_list()) {
+                        unflattened_props[ind][key] = el;
+                        ++ind;
+                    }
+                }
+                else {
+                    non_list_props[key] = prop_val;
+                }
+            }
+
+            return { non_list_props, unflattened_props };
+        }(props);
+
         luwra::StateWrapper state;
         state.loadStandardLibrary();
         register_userdata_property_value(state);
+        state[keywords::CONTEXT] = context;
         const auto& tag_config = config_->tags.at(std::string{ tag });
 
-        state[keywords::CONTEXT] = context;
-        state[keywords::INPUT_TABLE] = props;
-        state[keywords::OUTPUT_TABLE] = Fields{};
-        // base script
-        if (const auto& script = tag_config.serialization_script) {
-            const auto script_run_result = state.runString(script->c_str());
-            if (script_run_result != LUA_OK) {
-                const auto error = state.read<std::string>(-1);
-                return make_serialize_err(serialize_err::ScriptError{ error });
+        const auto props_to_fields =    //
+            [](luwra::StateWrapper& state, Properties const& props, Tag const& tag_config
+            ) -> std::expected<dynser::Fields, dynser::SerializeError> {
+            state[keywords::INPUT_TABLE] = props;
+            state[keywords::OUTPUT_TABLE] = Fields{};
+            // run script
+            if (const auto& script = tag_config.serialization_script) {
+                const auto script_run_result = state.runString(script->c_str());
+                if (script_run_result != LUA_OK) {
+                    const auto error = state.read<std::string>(-1);
+                    return std::unexpected{ dynser::SerializeError{ serialize_err::ScriptError{ error }, {} } };
+                }
+            }
+            return state[keywords::OUTPUT_TABLE].read<dynser::Fields>();
+        };
+
+        Fields fields;
+        if (!non_list_props.empty()) {
+            auto non_list_fields_sus = props_to_fields(state, non_list_props, tag_config);
+            if (!non_list_fields_sus) {
+                return make_serialize_err(std::move(non_list_fields_sus.error().error));
+            }
+            fields = *non_list_fields_sus;
+        }    // else only list-fields
+
+        // input (unflattened_props_vector): [ { 'b': 1 }, { 'b': 2 }, { 'b': 3 } ]
+        // output (unflattened_fields): [ { 'b': '1' }, { 'b': '2' }, { 'b': '3' } ]
+        std::vector<Fields> unflattened_fields;    // for recurrent
+        if (!unflattened_props_vector.empty()) {
+            for (auto const& unflattened_props : unflattened_props_vector) {
+                auto unflattened_fields_sus = props_to_fields(state, unflattened_props, tag_config);
+                if (!unflattened_fields_sus) {
+                    return make_serialize_err(std::move(unflattened_fields_sus.error().error));
+                }
+                unflattened_fields.push_back(*unflattened_fields_sus);
             }
         }
-        const auto fields = state[keywords::OUTPUT_TABLE].read<dynser::Fields>();
 
         // nested
         return util::visit_one(
@@ -461,23 +513,32 @@ public:
 
                 // max length of property lists
                 // FIXME remove unwrap
+                // FIXME is priority unused?
                 const auto max_len = dynser::details::calc_max_property_lists_len(*config_, props, recurrent)->second;
 
                 for (std::size_t ind{}; ind < max_len; ++ind) {
-                    for (const auto& recurrent_rule : recurrent) {    // FIXME add as_list stuff
+                    for (const auto& recurrent_rule : recurrent) {
+                        // split lists in props and fields into current element
+                        auto curr_fields = fields;
+                        if (unflattened_fields.size() > ind) {
+                            curr_fields.merge(unflattened_fields[ind]);
+                        }
+                        auto curr_props = props;
+                        if (unflattened_props_vector.size() > ind) {
+                            for (auto const& [key, val] : unflattened_props_vector[ind]) {
+                                curr_props[key] = val;
+                            }
+                        }
                         const auto serialized_recurrent = util::visit_one(
                             recurrent_rule,
-                            [&](const RecExisting& dymmy) -> SerializeResult {
-                                // FIXME
-                                return {};
-                            },
-                            [&](const RecLinear& dymmy) -> SerializeResult {
-                                // FIXME
-                                return {};
-                            },
-                            [&](const RecInfix& dymmy) -> SerializeResult {
-                                // FIXME
-                                return {};
+                            gen_existing_process_helper<RecExisting>(curr_props, curr_fields),
+                            gen_linear_process_helper<RecLinear>(curr_props, curr_fields),
+                            [&](const RecInfix& rule) -> SerializeResult {
+                                if (ind == max_len - 1) {
+                                    return "";    // infix rule -> return empty string on last element
+                                }
+
+                                return gen_linear_process_helper<RecInfix>(curr_props, curr_fields)(rule);
                             }
                         );
                         if (!serialized_recurrent) {

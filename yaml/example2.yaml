@@ -113,11 +113,35 @@ tags:
 
   - name: "pos-list"
     continual:
-      - linear: { pattern: "[ " }
+      - linear: { pattern: '\[ ' }
       - existing: { tag: "pos-list-payload" }
-      - linear: { pattern: " ]" }
+      - linear: { pattern: ' \]' }
   - name: "pos-list-payload"
     recurrent:
-      - existing: { tag: "pos", priority: 1 }
-      - infix: { pattern: ", " }
+      - linear: { pattern: '\( ' }
+      - existing: { tag: "pos" }
+      - linear: { pattern: ' \)' }
+      - infix: { pattern: ', ' }
+
+  - name: "pos-list-list"
+    continual:
+      - linear: { pattern: '\[ ' }
+      - existing: { tag: "pos-list-list-payload" }
+      - linear: { pattern: ' \]' }
+  - name: "pos-list-list-payload"
+    recurrent:
+      - existing: { tag: "pos-list", priority: 2 }
+      - infix: { pattern: ', ' }
+
+  - name: "existing-existing-test"
+    continual:
+      - linear: { pattern: 'exex: ' }
+      - existing: { tag: "existing-test" }
+  - name: "existing-test"
+    continual:
+      - linear: { pattern: 'ex: ' }
+      - existing: { tag: "existing-test-payload" }
+  - name: "existing-test-payload"
+    continual:
+      - linear: { pattern: 'existing-test-data' }
 ...

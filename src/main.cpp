@@ -17,7 +17,7 @@ struct Overload : Fs...
 
 int main()
 {
-    if constexpr (false) {
+    if constexpr (true) {
         struct Printer
         {
             std::string serialize_err_to_string(dynser::SerializeError const& wrapper) noexcept
@@ -232,17 +232,30 @@ int main()
             return target == *deserialize_result;
         };
 
+        const auto serialize_props_print = [&ser, &printer](const auto& props, const std::string_view tag) noexcept {
+            const auto serialize_result = ser.serialize_props(props, tag);
+            std::cout << std::format("serialized '{}' is '{}'\n", tag, serialize_result ? *serialize_result : "none");
+            if (!serialize_result) {
+                std::cout << std::format(
+                    "Serialize error of '{}': {}", tag, printer.serialize_err_to_string(serialize_result.error())
+                );
+                return false;
+            }
+            return true;
+        };
+
         ser.context["val-length"] = dynser::PropertyValue{ "4" };
         ser.context["type"] = dynser::PropertyValue{ "a" };
 
         std::size_t res{};
-        res += round_trip(foo, "foo");
-        res += round_trip(from, "pos");
-        res += round_trip(input, "input");
-        res += round_trip(bar, "bar");
-        res += round_trip(baz, "baz");
-        res += round_trip(std::vector<int>{ 14, 15, 16, 1034, -1249, 0, 0, -12948 }, "recursive");
-        // assert(res == 5);
+        // res += serialize_props_print(dynser::Properties{}, "existing-existing-test");
+        // res += round_trip(foo, "foo");
+        // res += round_trip(from, "pos");
+        // res += round_trip(input, "input");
+        // res += round_trip(bar, "bar");
+        // res += round_trip(baz, "baz");
+        // res += round_trip(std::vector<int>{ 14, 15, 16, 1034, -1249, 0, 0, -12948 }, "recursive");
+        res += round_trip(std::vector<Pos>{ { 1, 2 }, { 3, 4 } }, "pos-list");
     }
 
     if constexpr (false) {
@@ -421,7 +434,7 @@ int main()
         }
     }
 
-    if constexpr (true) {
+    if constexpr (false) {
         using namespace dynser::config;
         using namespace dynser::details;
         using dynser::Properties;
@@ -441,20 +454,78 @@ int main()
 
         Config config{ *from_string(buffer.str()) };
 
-        const std::optional<PrioritizedListLen> results[]{
-            calc_max_property_lists_len(
-                config,
+        using dynser::config::details::yaml::PriorityType;
+
+        const auto gen_result =
+            [&](Properties&& props, std::string_view const tag, std::optional<PrioritizedListLen> const& expected
+            ) -> std::pair<std::optional<PrioritizedListLen>, std::optional<PrioritizedListLen>> {
+            return { calc_max_property_lists_len(config, std::move(props), config.tags.at(std::string{ tag }).nested),
+                     expected };
+        };
+
+        std::pair<std::optional<PrioritizedListLen>, std::optional<PrioritizedListLen>> const results[]{
+            gen_result(
                 Properties{
                     //
                     { "x", PV{ Lst{ PV{ 1 }, PV{ 2 }, PV{ 3 } } } },
                     { "y", PV{ Lst{} } },    //
                 },
-                config.tags.at("pos-list-payload").nested
+                "pos-list-payload",
+                { { 1, 3 } }
             ),
+            gen_result(
+
+                Properties{
+                    //
+                    { "x", PV{ Lst{ PV{ 1 }, PV{ 2 }, PV{ 3 } } } },
+                    { "y", PV{ Lst{ PV{ 1 }, PV{ 2 }, PV{ 3 }, PV{ 4 } } } },
+                },
+                "pos-list-payload",
+                { { 1, 4 } }
+            ),
+            gen_result(
+
+                Properties{
+                    //
+                    { "x", PV{ Lst{ PV{ 1 }, PV{ 2 }, PV{ 3 } } } },
+                    { "y", PV{ Lst{ PV{ 1 }, PV{ 2 }, PV{ 3 }, PV{ 4 } } } },
+                    { "z", PV{ Lst{ PV{ 1 }, PV{ 2 }, PV{ 3 }, PV{ 4 }, PV{ 5 } } } },
+                },
+                "pos-list-payload",
+                { { 1, 4 } }
+            ),
+            gen_result(
+
+                Properties{
+                    //
+                    { "x", PV{ 3 } },
+                    { "y", PV{ 5 } },
+                },
+                "pos-list-payload",
+                std::nullopt
+            ),
+            gen_result(
+                Properties{
+                    //
+                    { "x", PV{ 3 } },
+                    { "y", PV{ Lst{ PV{ 5 } } } },
+                },
+                "pos-list-payload",
+                { { 1, 1 } }
+            ),
+            gen_result(
+                Properties{
+                    //
+                    { "x", PV{ Lst{ PV{ 1 } } } },
+                    { "y", PV{ Lst{ PV{ 1 } } } },
+                },
+                "pos-list-list-payload",
+                { { 2, 1 } }
+            )
         };
 
-        for (const auto& result : results) {
-            std::cout << result_as_string(result) << std::endl;
+        for (const auto& [result, expected] : results) {
+            std::cout << std::format("res: {}; expected: {}\n", result_as_string(result), result_as_string(expected));
         }
     }
 }
