@@ -6,55 +6,21 @@ if (POLICY CMP0141)
   set (CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
 endif ()
 
-project (main)
+project (dynser)
+
+#######################################
+# Options
+#######################################
+
+option (DYNSER_BUILD_TESTS "Build tests" OFF)
 
 #######################################
 # Source
 #######################################
 
-add_subdirectory ("src/dynser")
+if (DYNSER_BUILD_TESTS)
+    add_subdirectory ("test")
+endif ()
 
-add_executable (
-    main
-    "src/main.cpp"
-    "src/util/collection_print.hpp"
-    "src/util/lua_manual_debug.hpp"
-    "src/util/misc.hpp"
-)
-
-target_include_directories (
-    main
-    PRIVATE
-    "src/util"
-)
-
-set_property (TARGET main PROPERTY CXX_STANDARD 23)
-
-# move yaml configs to binary dir
-# FIXME copy directory instead of symlinking would be better?
-add_custom_command (
-    TARGET main
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E create_symlink
-        "${CMAKE_SOURCE_DIR}/yaml/"
-        "$<TARGET_FILE_DIR:main>/yaml/"
-)
-
-# compile warnings
-target_compile_options (
-    main
-    INTERFACE
-    "$<$<COMPILE_LANG_AND_ID:CXX,ARMClang,AppleClang,Clang,GNU,LCC>:$<BUILD_INTERFACE:-Wall;-Wextra;-Wshadow;-Wformat=2;-Wunused>>"
-    "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:$<BUILD_INTERFACE:-W3>>"
-)
-
-#######################################
-# Link
-#######################################
-
-# link
-target_link_libraries (
-    main
-    dynser
-)
+add_subdirectory (src/dynser)
 

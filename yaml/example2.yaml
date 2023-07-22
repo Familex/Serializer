@@ -6,18 +6,29 @@ tags:
     continual:
       - existing: { tag: "bar" }
       - linear:
-          pattern: '\.(\d+)\.'
+          pattern: '\.(-?\d+)\.'
           fields:
             1: dot-stopped
       - linear:
-          pattern: '\d{\_1}'
+          pattern: '-?\d{\_1}'
           dyn-groups:
             1: val-length
           fields:
             0: len-stopped
     serialization-script: |
       out['dot-stopped'] = tostring(inp['dot-stopped']:as_i32())
-      out['len-stopped'] = tostring(inp['len-stopped']:as_i32())
+      local len_stopped_str = tostring(inp['len-stopped']:as_i32())
+      local is_neg = inp['len-stopped']:as_i32() < 0
+      local len = tonumber(ctx['val-length']:as_string())
+      while len_stopped_str:len() < len + (is_neg and 1 or 0) do
+        if is_neg then
+          -- add '0' after minus sign
+          len_stopped_str = len_stopped_str:sub(1, 1) .. '0' .. len_stopped_str:sub(2)
+        else
+          len_stopped_str = '0' .. len_stopped_str
+        end
+      end
+      out['len-stopped'] = len_stopped_str
     deserialization-script: |
       out['dot-stopped'] = tonumber(inp['dot-stopped'])
       out['len-stopped'] = tonumber(inp['len-stopped'])
@@ -62,7 +73,7 @@ tags:
   - name: "pos"
     continual:
       - linear:
-          pattern: '(\d+), (\d+)'
+          pattern: '(-?\d+), (-?\d+)'
           fields:
             1: x
             2: y

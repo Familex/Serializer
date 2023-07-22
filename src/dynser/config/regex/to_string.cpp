@@ -33,8 +33,8 @@ std::optional<std::string> try_relent(const std::string_view sv, const details::
     using namespace details::regex;
     using Result = std::optional<std::string>;
 
+    // for \d and \w
     return [&]() -> Result {
-        // for \d and \w
         if (reg.value.size() != 1) {
             // more than one token
             return std::nullopt;
