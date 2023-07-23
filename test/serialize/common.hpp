@@ -1,6 +1,8 @@
 #pragma once
 
 #include "dynser.h"
+#include "printer.hpp"
+#include <catch2/catch_test_macros.hpp>
 
 namespace dynser_test
 {
@@ -106,6 +108,10 @@ inline dynser::DynSer ser{
         },
         [](dynser::Context& ctx, const std::vector<int>& target) {
             dynser::Properties result;
+
+            if (target.empty()) {
+                return result;
+            }
 
             for (std::size_t cnt{}, ind{}; ind < target.size() - 1; ++ind) {
                 auto val = dynser::PropertyValue{ target[ind] };
@@ -308,5 +314,29 @@ tags:
         load_result = ser.load_config(dynser::config::RawContents{ common_dynser_config });
     }
 } inline const trigger_load_dynser_config{};
+
+#define DYNSER_TEST_SERIALIZE(target, tag, expected)                                                                   \
+    do {                                                                                                               \
+        using namespace dynser_test;                                                                                   \
+        const auto serialized = ser.serialize(target, tag);                                                            \
+        if (!serialized) {                                                                                             \
+            UNSCOPED_INFO("Serialize error: " << Printer{}.serialize_err_to_string(serialized.error()));               \
+        }                                                                                                              \
+        REQUIRE(serialized);                                                                                           \
+        CHECK(*serialized == expected);                                                                                \
+    } while (false);
+
+#define DYNSER_TEST_SERIALIZE_CTX(target, tag, expected, context)                                                      \
+    do {                                                                                                               \
+        using namespace dynser_test;                                                                                   \
+        ser.context = context;                                                                                         \
+        const auto serialized = ser.serialize(target, tag);                                                            \
+        if (!serialized) {                                                                                             \
+            UNSCOPED_INFO("Serialize error: " << Printer{}.serialize_err_to_string(serialized.error()));               \
+        }                                                                                                              \
+        REQUIRE(serialized);                                                                                           \
+        CHECK(*serialized == expected);                                                                                \
+        ser.context.clear();                                                                                           \
+    } while (false);
 
 }    // namespace dynser_test
