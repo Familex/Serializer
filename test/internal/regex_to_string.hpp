@@ -3,8 +3,8 @@
 
 TEST_CASE("Regex to string")
 {
-    using namespace dynser::config::details::regex;
-    using dynser::config::details::yaml::GroupValues;
+    using namespace dynser::regex;
+    using dynser::config::yaml::GroupValues;
 
     struct Test
     {

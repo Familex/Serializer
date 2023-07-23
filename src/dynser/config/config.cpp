@@ -15,7 +15,7 @@
 #include <iostream>
 #endif
 
-using namespace dynser::config;
+using namespace dynser;
 
 // https://stackoverflow.com/a/37516316
 namespace
@@ -62,8 +62,8 @@ std::string regex_replace(const std::string& s, const std::basic_regex<CharT, Tr
 }
 }    // namespace
 
-details::yaml::Regex
-details::resolve_dyn_regex(const yaml::DynRegex& dyn_reg, const yaml::DynGroupValues& dyn_gr_vals) noexcept
+config::yaml::Regex
+config::details::resolve_dyn_regex(const yaml::DynRegex& dyn_reg, const yaml::DynGroupValues& dyn_gr_vals) noexcept
 {
     static const std::regex dyn_gr_pattern{ R"(\\_(\d+))" };
     return { regex_replace(dyn_reg, dyn_gr_pattern, [&dyn_gr_vals](const std::smatch& m) {
@@ -75,11 +75,11 @@ details::resolve_dyn_regex(const yaml::DynRegex& dyn_reg, const yaml::DynGroupVa
     }) };
 }
 
-details::regex::ToStringResult details::resolve_regex(const yaml::Regex& reg, const yaml::GroupValues& vals) noexcept
+regex::ToStringResult config::details::resolve_regex(const yaml::Regex& reg, const yaml::GroupValues& vals) noexcept
 {
-    using namespace details::regex;
+    using namespace dynser::regex;
 
-    auto reg_sus = from_string(reg);
+    auto reg_sus = regex::from_string(reg);
     if (!reg_sus) {
         return std::unexpected{ ToStringError{
             to_string_err::RegexSyntaxError{ reg_sus.error() },
@@ -114,13 +114,13 @@ inline std::optional<Res> as_opt(YAML::Node const& node) noexcept
 
 }    // namespace
 
-std::optional<Config> dynser::config::from_string(const std::string_view sv) noexcept
+std::optional<config::Config> config::from_string(const std::string_view sv) noexcept
 {
     // FIXME add tags to field names to prevent collisions
 
     try {
         using namespace dynser::config;
-        using namespace dynser::config::details::yaml;
+        using namespace dynser::config::yaml;
 
         const auto yaml = YAML::Load(std::string{ sv });
         Config result;
@@ -132,60 +132,54 @@ std::optional<Config> dynser::config::from_string(const std::string_view sv) noe
 
             result.tags[tag_name] = {
                 .name = tag_name,
-                .nested = [&]() -> details::yaml::Nested {    // iife
+                .nested = [&]() -> yaml::Nested {    // iife
                     if (const auto continual = tag[keywords::NESTED_CONTINUAL]) {
-                        details::yaml::Continual nested;
+                        yaml::Continual nested;
 
                         for (const auto continual_rule_type : continual) {
                             if (const auto rule = continual_rule_type[keywords::CONTINUAL_EXISTING]) {
-                                nested.push_back(details::yaml::ConExisting{
+                                nested.push_back(ConExisting{
                                     .tag = rule[keywords::CONTINUAL_EXISTING_TAG].as<std::string>(),
                                     .prefix = as_opt<std::string>(rule[keywords::CONTINUAL_EXISTING_PREFIX]),
                                     .required =
                                         as_opt<bool>(rule[keywords::CONTINUAL_EXISTING_REQUIRED]).value_or(true) });
                             }
                             else if (const auto rule = continual_rule_type[keywords::CONTINUAL_LINEAR]) {
-                                nested.push_back(details::yaml::ConLinear{
+                                nested.push_back(ConLinear{
                                     .pattern = rule[keywords::CONTINUAL_LINEAR_PATTERN].as<std::string>(),
-                                    .dyn_groups = as_opt<details::yaml::DynGroupValues>(
-                                        rule[keywords::CONTINUAL_LINEAR_DYN_GROUPS]
-                                    ),
-                                    .fields =
-                                        as_opt<details::yaml::GroupValues>(rule[keywords::CONTINUAL_LINEAR_FIELDS]) });
+                                    .dyn_groups = as_opt<DynGroupValues>(rule[keywords::CONTINUAL_LINEAR_DYN_GROUPS]),
+                                    .fields = as_opt<GroupValues>(rule[keywords::CONTINUAL_LINEAR_FIELDS]) });
                             }
                         }
 
                         return nested;
                     }
                     else if (const auto branched = tag[keywords::NESTED_BRANCHED]) {
-                        details::yaml::Branched nested;
+                        Branched nested;
 
                         nested.branching_script = branched[keywords::BRANCHED_BRANCHING_SCRIPT].as<std::string>();
                         nested.debranching_script = branched[keywords::BRANCHED_DEBRANCHING_SCRIPT].as<std::string>();
 
                         for (const auto branched_rule_type : branched[keywords::BRANCHED_RULES]) {
                             if (const auto rule = branched_rule_type[keywords::BRANCHED_EXISTING]) {
-                                nested.rules.push_back(details::yaml::BraExisting{
+                                nested.rules.push_back(BraExisting{
                                     .tag = rule[keywords::BRANCHED_EXISTING_TAG].as<std::string>(),
                                     .prefix = as_opt<std::string>(rule[keywords::BRANCHED_EXISTING_PREFIX]),
                                     .required =
                                         as_opt<bool>(rule[keywords::BRANCHED_EXISTING_REQUIRED]).value_or(true) });
                             }
                             else if (const auto rule = branched_rule_type[keywords::BRANCHED_LINEAR]) {
-                                nested.rules.push_back(details::yaml::BraLinear{
+                                nested.rules.push_back(BraLinear{
                                     .pattern = rule[keywords::BRANCHED_LINEAR_PATTERN].as<std::string>(),
-                                    .dyn_groups =
-                                        as_opt<details::yaml::DynGroupValues>(rule[keywords::BRANCHED_LINEAR_DYN_GROUPS]
-                                        ),
-                                    .fields =
-                                        as_opt<details::yaml::GroupValues>(rule[keywords::BRANCHED_LINEAR_FIELDS]) });
+                                    .dyn_groups = as_opt<DynGroupValues>(rule[keywords::BRANCHED_LINEAR_DYN_GROUPS]),
+                                    .fields = as_opt<GroupValues>(rule[keywords::BRANCHED_LINEAR_FIELDS]) });
                             }
                         }
 
                         return nested;
                     }
                     else if (const auto recurrent = tag[keywords::NESTED_RECURRENT]) {
-                        details::yaml::Recurrent nested;
+                        Recurrent nested;
 
                         for (const auto recurrent_rule_type : recurrent) {
                             if (const auto rule = recurrent_rule_type[keywords::RECURRENT_EXISTING]) {
@@ -204,11 +198,8 @@ std::optional<Config> dynser::config::from_string(const std::string_view sv) noe
                             else if (const auto rule = recurrent_rule_type[keywords::RECURRENT_LINEAR]) {
                                 nested.push_back(RecLinear{
                                     .pattern = rule[keywords::RECURRENT_LINEAR_PATTERN].as<std::string>(),
-                                    .dyn_groups = as_opt<details::yaml::DynGroupValues>(
-                                        rule[keywords::RECURRENT_LINEAR_DYN_GROUPS]
-                                    ),
-                                    .fields =
-                                        as_opt<details::yaml::GroupValues>(rule[keywords::RECURRENT_LINEAR_FIELDS]),
+                                    .dyn_groups = as_opt<DynGroupValues>(rule[keywords::RECURRENT_LINEAR_DYN_GROUPS]),
+                                    .fields = as_opt<GroupValues>(rule[keywords::RECURRENT_LINEAR_FIELDS]),
                                     .wrap = as_opt<bool>(rule[keywords::RECURRENT_LINEAR_WRAP]).value_or(false),
                                     .default_value =
                                         as_opt<std::string>(rule[keywords::RECURRENT_LINEAR_DEFAULT_VALUE]),
@@ -219,11 +210,8 @@ std::optional<Config> dynser::config::from_string(const std::string_view sv) noe
                             else if (const auto rule = recurrent_rule_type[keywords::RECURRENT_INFIX]) {
                                 nested.push_back(RecInfix{
                                     .pattern = rule[keywords::RECURRENT_INFIX_PATTERN].as<std::string>(),
-                                    .dyn_groups =
-                                        as_opt<details::yaml::DynGroupValues>(rule[keywords::RECURRENT_INFIX_DYN_GROUPS]
-                                        ),
-                                    .fields =
-                                        as_opt<details::yaml::GroupValues>(rule[keywords::RECURRENT_INFIX_FIELDS]),
+                                    .dyn_groups = as_opt<DynGroupValues>(rule[keywords::RECURRENT_INFIX_DYN_GROUPS]),
+                                    .fields = as_opt<GroupValues>(rule[keywords::RECURRENT_INFIX_FIELDS]),
                                     .wrap = as_opt<bool>(rule[keywords::RECURRENT_INFIX_WRAP]).value_or(false),
                                     .default_value = as_opt<std::string>(rule[keywords::RECURRENT_INFIX_DEFAULT_VALUE]),
                                 });
@@ -235,8 +223,8 @@ std::optional<Config> dynser::config::from_string(const std::string_view sv) noe
 
                     std::unreachable();
                 }(),
-                .serialization_script = as_opt<details::yaml::Script>(tag[keywords::SERIALIZATION_SCRIPT]),
-                .deserialization_script = as_opt<details::yaml::Script>(tag[keywords::DESERIALIZATION_SCRIPT]),
+                .serialization_script = as_opt<Script>(tag[keywords::SERIALIZATION_SCRIPT]),
+                .deserialization_script = as_opt<Script>(tag[keywords::DESERIALIZATION_SCRIPT]),
             };
         }
 

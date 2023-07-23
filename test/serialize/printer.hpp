@@ -40,7 +40,7 @@ struct Printer
                     return std::format("script variable '{}' not set", error.variable_name);
                 },
                 [](const ResolveRegexError& error) -> std::string {
-                    using namespace dynser::config::details::regex::to_string_err;
+                    using namespace dynser::regex::to_string_err;
 
                     return std::format(
                         "regex error '{}' on group '{}'",

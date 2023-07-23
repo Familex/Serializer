@@ -3,7 +3,7 @@
 
 TEST_CASE("Regex parse check")
 {
-    using namespace dynser::config::details::regex;
+    using namespace dynser::regex;
 
     struct Test
     {

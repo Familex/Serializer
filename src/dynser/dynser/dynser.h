@@ -74,7 +74,7 @@ struct ScriptVariableNotFound
 
 struct ResolveRegexError
 {
-    config::details::regex::ToStringError error;
+    regex::ToStringError error;
 };
 
 using Error = std::variant<
@@ -156,20 +156,20 @@ Fields props_to_fields(const Properties& props) noexcept
     return result;
 }
 
-using PrioritizedListLen = std::pair<config::details::yaml::PriorityType, std::size_t>;
+using PrioritizedListLen = std::pair<config::yaml::PriorityType, std::size_t>;
 
 // forward declaration
 std::optional<PrioritizedListLen>
-calc_max_property_lists_len(config::Config const&, Properties const&, config::details::yaml::Nested const&) noexcept;
+calc_max_property_lists_len(config::Config const&, Properties const&, config::yaml::Nested const&) noexcept;
 
 // for existing and linear rules
 std::optional<PrioritizedListLen> calc_max_property_lists_len_helper(
     config::Config const& config,
     Properties const& props,
-    config::details::yaml::LikeExisting auto const& rule
+    config::yaml::LikeExisting auto const& rule
 ) noexcept
 {
-    using namespace config::details::yaml;
+    using namespace config::yaml;
 
     auto result = calc_max_property_lists_len(config, props, config.tags.at(rule.tag).nested);
 
@@ -185,10 +185,10 @@ std::optional<PrioritizedListLen> calc_max_property_lists_len_helper(
 std::optional<PrioritizedListLen> calc_max_property_lists_len_helper(
     config::Config const& config,
     Properties const& props,
-    config::details::yaml::LikeLinear auto const& rule
+    config::yaml::LikeLinear auto const& rule
 ) noexcept
 {
-    using namespace config::details::yaml;
+    using namespace config::yaml;
 
     std::optional<std::size_t> result{ std::nullopt };
 
@@ -230,10 +230,10 @@ std::optional<PrioritizedListLen> calc_max_property_lists_len_helper(
 std::optional<PrioritizedListLen> calc_max_property_lists_len(
     config::Config const& config,
     Properties const& props,
-    config::details::yaml::Nested const& rules
+    config::yaml::Nested const& rules
 ) noexcept
 {
-    using namespace config::details::yaml;
+    using namespace config::yaml;
 
     std::optional<PrioritizedListLen> result{ std::nullopt };
 
@@ -319,7 +319,7 @@ class DynSer
     auto gen_linear_process_helper(const auto& props, const auto& after_script_fields) noexcept
     {
         return [&](const Linear& nested) noexcept -> dynser::SerializeResult {
-            using config::details::yaml::GroupValues;
+            using config::yaml::GroupValues;
 
             const auto pattern =
                 nested.dyn_groups
@@ -370,7 +370,7 @@ public:
             return make_serialize_err(serialize_err::ConfigNotLoaded{});
         }
 
-        using namespace config::details::yaml;
+        using namespace config::yaml;
         using namespace config;
 
         // input: { 'a': 0, 'b': [ 1, 2, 3 ] }

@@ -20,7 +20,7 @@ struct RawContents
     std::string config;
 };
 
-namespace details::yaml
+namespace yaml
 {
 using PriorityType = std::int32_t;
 
@@ -61,21 +61,21 @@ struct RecExisting
 
 struct ConLinear
 {
-    details::yaml::Regex pattern;
+    yaml::Regex pattern;
     std::optional<DynGroupValues> dyn_groups;
     std::optional<GroupValues> fields;
 };
 
 struct BraLinear
 {
-    details::yaml::Regex pattern;
+    yaml::Regex pattern;
     std::optional<DynGroupValues> dyn_groups;
     std::optional<GroupValues> fields;
 };
 
 struct RecLinear
 {
-    details::yaml::Regex pattern;
+    yaml::Regex pattern;
     std::optional<DynGroupValues> dyn_groups;
     std::optional<GroupValues> fields;
 
@@ -86,7 +86,7 @@ struct RecLinear
 
 struct RecInfix
 {
-    details::yaml::Regex pattern;
+    yaml::Regex pattern;
     std::optional<DynGroupValues> dyn_groups;
     std::optional<GroupValues> fields;
 
@@ -137,18 +137,18 @@ template <typename Rule>
 concept LikeLinear = requires(Rule const rule) {
     {
         rule.pattern
-    } -> std::same_as<details::yaml::Regex const&>;
+    } -> std::same_as<Regex const&>;
     {
         rule.fields
     } -> std::same_as<std::optional<GroupValues> const&>;
 };
 
-}    // namespace details::yaml
+}    // namespace yaml
 
 struct Config
 {
     std::string version;
-    details::yaml::Tags tags;
+    yaml::Tags tags;
 };
 
 }    // namespace dynser::config
