@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dynser.h"
+#include <format>
 
 namespace dynser_test
 {
@@ -66,7 +67,42 @@ struct Printer
         );
 
         return error_str + ref_str;
-    }    // namespace dynser_test
+    }
+
+    std::string config_parse_err_to_string(dynser::config::ParseError const& error) noexcept
+    {
+        using enum dynser::config::ParseError::Type;
+
+        switch (error.type) {
+            case ParserException:
+                return std::format(
+                    "yaml-cpp parser exception at 'pos: {}, line: {}, col: {}' with msg: {}",
+                    error.mark.pos,
+                    error.mark.line,
+                    error.mark.column,
+                    error.msg
+                );
+            case RepresentationException:
+                return std::format(
+                    "yaml-cpp representation exception at 'pos: {}, line: {}, col: {}' with msg: {}",
+                    error.mark.pos,
+                    error.mark.line,
+                    error.mark.column,
+                    error.msg
+                );
+            case UnknownYamlCppException:
+                return std::format(
+                    "yaml-cpp unknown exception at 'pos: {}, line: {}, col: {}' with msg: {}",
+                    error.mark.pos,
+                    error.mark.line,
+                    error.mark.column,
+                    error.msg
+                );
+            case UnknownException:
+                return std::format("unknown exception");
+        }
+        std::unreachable();
+    }
 };
 
 }    // namespace dynser_test

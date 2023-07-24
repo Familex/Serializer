@@ -36,10 +36,7 @@ tags:
 
     auto ser = get_dynser_instance();
 
-    const auto result = ser.load_config(dynser::config::RawContents{ config });
-
-    INFO("Config: " << config);
-    REQUIRE(result);
+    DYNSER_LOAD_CONFIG(ser, dynser::config::RawContents{ config });
 
     SECTION("'Pos-list' rule", "[recurrent]")
     {

@@ -202,4 +202,13 @@ auto get_dynser_instance() noexcept
         ser.context.clear();                                                                                           \
     } while (false);
 
+#define DYNSER_LOAD_CONFIG(ser, config)                                                                                \
+    do {                                                                                                               \
+        const auto load_result = ser.load_config(config);                                                              \
+        if (!load_result) {                                                                                            \
+            UNSCOPED_INFO("Load config error: " << Printer{}.config_parse_err_to_string(load_result.error()));         \
+        }                                                                                                              \
+        REQUIRE(load_result);                                                                                          \
+    } while (false);
+
 }    // namespace dynser_test

@@ -1,8 +1,10 @@
 #pragma once
 
+#include "yaml-cpp/yaml.h"
 #include <unordered_map>
 
 #include <concepts>
+#include <expected>
 #include <optional>
 #include <string>
 #include <variant>
@@ -145,6 +147,19 @@ concept LikeLinear = requires(Rule const rule) {
 
 }    // namespace yaml
 
+// dynamic exceptions adapter
+struct ParseError
+{
+    enum class Type {
+        ParserException,
+        RepresentationException,
+        UnknownYamlCppException,
+        UnknownException,    // mark and msg invalid
+    } type;
+    YAML::Mark mark;
+    std::string msg;
+};
+
 struct Config
 {
     std::string version;
@@ -153,5 +168,7 @@ struct Config
     // merge tags and version from other config
     void merge(Config&&) noexcept;
 };
+
+using ParseResult = std::expected<Config, ParseError>;
 
 }    // namespace dynser::config

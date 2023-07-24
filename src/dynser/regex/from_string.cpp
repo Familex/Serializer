@@ -342,10 +342,8 @@ std::expected<std::pair<dynser::regex::Token, std::size_t>, std::size_t> parse_t
         // just character (like escaped)
         default:
             ++token_len;
-            std::string characters;
-            characters += sv[token_len - 1];    // FIXME make it in place (std::string{ 1, `char` }) doesn't worked
             return { { CharacterClass{
-                           characters,
+                           std::string(1, sv[token_len - 1]),
                            false,
                            search_quantifier(sv.substr(token_len), &token_len).value_or(without_quantifier) },
                        token_len } };

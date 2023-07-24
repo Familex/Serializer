@@ -20,7 +20,7 @@
     {
       "name": "x64-debug",
       "displayName": "x64 Debug",
-      "inherits": "windows-base",
+      "inherits": [ "windows-base" ],
       "architecture": {
         "value": "x64",
         "strategy": "external"
@@ -30,13 +30,9 @@
       }
     },
     {
-      "name": "x64-tests",
-      "displayName": "x64 Debug",
-      "inherits": "windows-base",
-      "architecture": {
-        "value": "x64",
-        "strategy": "external"
-      },
+      "name": "x64-debug-tests",
+      "displayName": "x64 Debug Tests",
+      "inherits": [ "x64-debug" ],
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "DYNSER_BUILD_TESTS": "ON"
@@ -45,29 +41,18 @@
     {
       "name": "x64-release",
       "displayName": "x64 Release",
-      "inherits": "x64-debug",
+      "inherits": [ "x64-debug" ],
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
     },
     {
-      "name": "x86-debug",
-      "displayName": "x86 Debug",
-      "inherits": "windows-base",
-      "architecture": {
-        "value": "x86",
-        "strategy": "external"
-      },
+      "name": "x64-release-tests",
+      "displayName": "x64 Release Tests",
+      "inherits": [ "x64-release" ],
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
-      }
-    },
-    {
-      "name": "x86-release",
-      "displayName": "x86 Release",
-      "inherits": "x86-debug",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
+        "CMAKE_BUILD_TYPE": "Release",
+        "DYNSER_BUILD_TESTS": "ON"
       }
     }
   ]

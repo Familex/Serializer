@@ -20,6 +20,6 @@ regex::ToStringResult resolve_regex(const yaml::Regex& reg, const yaml::GroupVal
  * \brief parse string and return config struct.
  * \throw if string is not valid yaml (see scheme).
  */
-std::optional<Config> from_string(const std::string_view sv) noexcept;
+std::expected<Config, ParseError> from_string(const std::string_view sv) noexcept;
 
 }    // namespace dynser::config

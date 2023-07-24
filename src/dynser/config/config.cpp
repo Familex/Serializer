@@ -9,12 +9,6 @@
 #include <optional>
 #include <regex>
 
-// debug print
-#ifdef _DEBUG
-#include <format>
-#include <iostream>
-#endif
-
 using namespace dynser;
 
 // https://stackoverflow.com/a/37516316
@@ -104,7 +98,7 @@ namespace
 {
 
 template <typename Res>
-inline std::optional<Res> as_opt(YAML::Node const& node) noexcept
+inline std::optional<Res> as_opt(YAML::Node const& node) noexcept(false) // throws YAML::BadConversion or anything
 {
     if (node.IsDefined()) {
         return node.as<Res>();
@@ -114,7 +108,7 @@ inline std::optional<Res> as_opt(YAML::Node const& node) noexcept
 
 }    // namespace
 
-std::optional<config::Config> config::from_string(const std::string_view sv) noexcept
+config::ParseResult config::from_string(const std::string_view sv) noexcept
 {
     try {
         using namespace dynser::config;
@@ -230,11 +224,16 @@ std::optional<config::Config> config::from_string(const std::string_view sv) noe
 
         return result;
     }
-    catch ([[maybe_unused]] std::exception& e) {
-// debug print FIXME proper error handling
-#ifdef _DEBUG
-        std::cerr << std::format("{} error: {}", __FUNCTION__, e.what()) << std::endl;
-#endif
+    catch (YAML::ParserException& ex) {
+        return std::unexpected{ ParseError{ ParseError::Type::ParserException, ex.mark, ex.msg } };
     }
-    return std::nullopt;
+    catch (YAML::RepresentationException& ex) {
+        return std::unexpected{ ParseError{ ParseError::Type::RepresentationException, ex.mark, ex.msg } };
+    }
+    catch (YAML::Exception& ex) {
+        return std::unexpected{ ParseError{ ParseError::Type::UnknownYamlCppException, ex.mark, ex.msg } };
+    }
+    catch (...) {
+        return std::unexpected{ ParseError{ ParseError::Type::UnknownException } };
+    }
 }

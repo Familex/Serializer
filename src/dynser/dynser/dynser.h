@@ -14,12 +14,6 @@
 #include <sstream>
 #include <string>
 
-// debug print
-#ifdef _DEBUG
-#include <format>
-#include <iostream>
-#endif
-
 namespace dynser
 {
 /**
@@ -289,12 +283,12 @@ class DynSer
 {
     std::optional<config::Config> config_{};
 
-    std::optional<config::Config> from_file(const config::RawContents& wrapper) noexcept
+    config::ParseResult from_file(const config::RawContents& wrapper) noexcept
     {
         return config::from_string(wrapper.config);
     }
 
-    std::optional<config::Config> from_file(const config::FileName& wrapper) noexcept
+    config::ParseResult from_file(const config::FileName& wrapper) noexcept
     {
         std::ifstream file{ wrapper.config_file_name };
         std::stringstream buffer;
@@ -308,8 +302,7 @@ class DynSer
     {
         return [&](const Existing& nested) noexcept -> dynser::SerializeResult {
             // remove prefix if exists
-            const auto without_prefix =
-                nested.prefix ? util::remove_prefix(props, *nested.prefix) : props;
+            const auto without_prefix = nested.prefix ? util::remove_prefix(props, *nested.prefix) : props;
             // replace parent props with child (existing) props
             const auto inp = util::remove_prefix(without_prefix, nested.tag) << without_prefix;
             const auto serialize_result = this->serialize_props(inp, nested.tag);
@@ -365,23 +358,23 @@ public:
     { }
 
     template <typename ConfigWrapper>
-    bool load_config(ConfigWrapper&& wrapper) noexcept
+    config::ParseResult load_config(ConfigWrapper&& wrapper) noexcept
     {
-        if (auto config = from_file(std::forward<ConfigWrapper>(wrapper))) {
+        auto config = from_file(std::forward<ConfigWrapper>(wrapper));
+        if (config) {
             config_ = std::move(*config);
-            return true;
         }
-        return false;
+        return config;
     }
 
     template <typename ConfigWrapper>
-    bool merge_config(ConfigWrapper&& wrapper) noexcept
+    config::ParseResult merge_config(ConfigWrapper&& wrapper) noexcept
     {
-        if (auto config = from_file(std::forward<ConfigWrapper>(wrapper))) {
+        auto config = from_file(std::forward<ConfigWrapper>(wrapper));
+        if (config) {
             config_->merge(std::move(*config));
-            return true;
         }
-        return false;
+        return config;
     }
 
     SerializeResult serialize_props(const Properties& props, const std::string_view tag) noexcept
