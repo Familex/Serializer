@@ -5,7 +5,7 @@ TEST_CASE("Continual rule #0")
     using namespace dynser_test;
 
     const auto config = R"##(---
-# yaml-language-server: $schema=yaml/schema_2.json
+# yaml-language-server: $schema=doc/dynser_config_schema.json
 version: ''
 tags:
   - name: "foo"

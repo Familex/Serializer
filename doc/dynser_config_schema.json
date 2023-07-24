@@ -1,0 +1,260 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "$id": "0.2",
+  "definitions": {
+    "field-pattern": {
+      "type": "string",
+      "description": "field serialization pattern"
+    },
+    "linear": {
+      "fields": {
+        "type": "object",
+        "description": "fields to [de]serialize",
+        "propertyNames": {
+          "pattern": "\\d+"
+        },
+        "patternProperties": {
+          "\\d+": {
+            "type": "string",
+            "description": "field name"
+          }
+        }
+      },
+      "dyn-groups": {
+        "type": "object",
+        "description": "groups what resolves in runtime",
+        "propertyNames": {
+          "pattern": "\\d+"
+        },
+        "patternProperties": {
+          "\\d+": {
+            "type": "string",
+            "description": "context variable name"
+          }
+        }
+      }
+    },
+    "existing": {
+      "properties": {
+        "tag": {
+          "type": "string",
+          "description": "existing tag name"
+        },
+        "prefix": {
+          "type": "string",
+          "description": "prefix field names to prevent collisions"
+        },
+        "required": {
+          "type": "boolean",
+          "description": "is this field required (may be used to break recursion sequence)",
+          "default": true
+        }
+      }
+    },
+    "recurrent": {
+      "wrap": {
+        "type": "boolean",
+        "description": "behavior when requesting an item outside the list boundaries: if true then request by wrapping list else use value from default section"
+      },
+      "default": {
+        "type": "string",
+        "description": "default value on of bounds element request"
+      },
+      "priority": {
+        "type": "integer",
+        "description": "priority of list field in max length calculation, the higher value - the higher priority"
+      }
+    }
+  },
+  "type": "object",
+  "required": [
+    "version",
+    "tags"
+  ],
+  "description": "YAML schema for this DynSer config files",
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "config version"
+    },
+    "tags": {
+      "type": "array",
+      "description": "description of tags",
+      "items": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "description": "tag what can be use to serialize fields",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "tag name",
+            "$comment": "'@' is reserved symbol",
+            "pattern": "^[a-zA-Z\\-]+$"
+          },
+          "continual": {
+            "type": "array",
+            "description": "pieces which describes tag (de)serialization",
+            "items": {
+              "type": "object",
+              "description": "field type",
+              "propertyNames": {
+                "pattern": "existing|linear"
+              },
+              "patternProperties": {
+                "existing": {
+                  "type": "object",
+                  "required": [
+                    "tag"
+                  ],
+                  "description": "existing field rule",
+                  "$ref": "#/definitions/existing"
+                },
+                "linear": {
+                  "type": "object",
+                  "required": [
+                    "pattern"
+                  ],
+                  "description": "define one-pattern rule",
+                  "properties": {
+                    "pattern": {
+                      "$ref": "#/definitions/field-pattern"
+                    },
+                    "fields": {
+                      "$ref": "#/definitions/linear/fields"
+                    },
+                    "dyn-groups": {
+                      "$ref": "#/definitions/linear/dyn-groups"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "branched": {
+            "type": "object",
+            "description": "use to branch serialization by fields",
+            "required": [
+              "branching-script",
+              "debranching-script",
+              "rules"
+            ],
+            "properties": {
+              "branching-script": {
+                "type": "string",
+                "description": "lua serialization script: set variable 'branch' to choose rule (value '-1' is unset)"
+              },
+              "debranching-script": {
+                "type": "string",
+                "description": "lua deserialization script: set variant type variables what determines it actual type"
+              },
+              "rules": {
+                "$ref": "#/properties/tags/items/properties/continual"
+              }
+            }
+          },
+          "recurrent": {
+            "type": "array",
+            "description": "use to handle repeating data",
+            "items": {
+              "type": "object",
+              "description": "field type",
+              "propertyNames": {
+                "pattern": "existing|linear|infix"
+              },
+              "patternProperties": {
+                "existing": {
+                  "type": "object",
+                  "required": [
+                    "tag"
+                  ],
+                  "description": "existing field rule",
+                  "properties": {
+                    "tag": {
+                      "$ref": "#/definitions/existing/properties/tag"
+                    },
+                    "prefix": {
+                      "$ref": "#/definitions/existing/properties/prefix"
+                    },
+                    "required": {
+                      "$ref": "#/definitions/existing/properties/required"
+                    },
+                    "wrap": {
+                      "$ref": "#/definitions/recurrent/wrap"
+                    },
+                    "default": {
+                      "$ref": "#/definitions/recurrent/default"
+                    },
+                    "priority": {
+                      "$ref": "#/definitions/recurrent/priority"
+                    }
+                  }
+                },
+                "linear": {
+                  "type": "object",
+                  "required": [
+                    "pattern"
+                  ],
+                  "description": "define one-pattern rule",
+                  "properties": {
+                    "pattern": {
+                      "$ref": "#/definitions/field-pattern"
+                    },
+                    "fields": {
+                      "$ref": "#/definitions/linear/fields"
+                    },
+                    "dyn-groups": {
+                      "$ref": "#/definitions/linear/dyn-groups"
+                    },
+                    "wrap": {
+                      "$ref": "#/definitions/recurrent/wrap"
+                    },
+                    "default": {
+                      "$ref": "#/definitions/recurrent/default"
+                    },
+                    "priority": {
+                      "$ref": "#/definitions/recurrent/priority"
+                    }
+                  }
+                },
+                "infix": {
+                  "type": "object",
+                  "required": [
+                    "pattern"
+                  ],
+                  "description": "linear rule, what will not be applied to last element",
+                  "properties": {
+                    "pattern": {
+                      "$ref": "#/definitions/field-pattern"
+                    },
+                    "fields": {
+                      "$ref": "#/definitions/linear/fields"
+                    },
+                    "dyn-groups": {
+                      "$ref": "#/definitions/linear/dyn-groups"
+                    },
+                    "wrap": {
+                      "$ref": "#/definitions/recurrent/wrap"
+                    },
+                    "default": {
+                      "$ref": "#/definitions/recurrent/default"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "serialization-script": {
+            "type": "string",
+            "description": "lua script for properties to fields conversion"
+          },
+          "deserialization-script": {
+            "type": "string",
+            "description": "lua script for fields to properties conversion"
+          }
+        }
+      }
+    }
+  }
+}

@@ -5,7 +5,6 @@ TEST_CASE("Recurrent rule")
     using namespace dynser_test;
 
     const auto config = R"##(---
-# yaml-language-server: $schema=./schema_2.json
 version: ''
 tags:
   - name: "pos-list"

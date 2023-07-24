@@ -5,7 +5,6 @@ TEST_CASE("Branched rule")
     using namespace dynser_test;
 
     const auto config = R"##(---
-# yaml-language-server: $schema=yaml/schema_2.json
 version: ''
 tags:
   - name: "bar"
