@@ -81,7 +81,7 @@ private:
 public:
     // FIXME LUWRA_MEMBER can't receive noexcept methods
 #define DYNSER_POPULATE_IS(name, type)                                                                                 \
-    inline decltype(auto) name() const { return is<type>(); } // FIXME use noexcept
+    inline decltype(auto) name() const { return is<type>(); }    // FIXME use noexcept
 
     DYNSER_POPULATE_IS(is_i32, std::int32_t)
     DYNSER_POPULATE_IS(is_i64, std::int64_t)
@@ -159,9 +159,15 @@ public:
 #undef DYNSER_POPULATE_AS
 };
 
-Properties operator+(Properties&& lhs, Properties&& rhs) noexcept
+Properties operator<<(Properties&& lhs, Properties&& rhs) noexcept
 {
     lhs.merge(rhs);
+    return lhs;
+}
+
+Properties operator<<(Properties&& lhs, Properties const& rhs) noexcept
+{
+    lhs.merge(Properties{ rhs });
     return lhs;
 }
 

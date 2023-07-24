@@ -58,6 +58,8 @@ struct Quuux
 
 auto get_dynser_instance() noexcept
 {
+    using namespace dynser::util;
+
     auto const bar_to_prop = [](dynser::Context&, const Bar& target) noexcept {
         return dynser::Properties{ { "is-left", dynser::PropertyValue{ target.is_left } } };
     };
@@ -65,6 +67,10 @@ auto get_dynser_instance() noexcept
     auto const pos_to_prop = [](dynser::Context&, const Pos& target) noexcept {
         return dynser::Properties{ { "x", dynser::PropertyValue{ target.x } },
                                    { "y", dynser::PropertyValue{ target.y } } };
+    };
+
+    auto const quux_to_prop = [](dynser::Context&, const Quux& target) -> dynser::Properties {
+        return { { "value", dynser::PropertyValue{ target.value } } };
     };
 
     auto const prop_to_bar = [](dynser::Context&, dynser::Properties&& props, Bar& out) noexcept {
@@ -88,15 +94,15 @@ auto get_dynser_instance() noexcept
             prop_to_pos,
             [&](dynser::Context& ctx, dynser::Properties&& props, Input& out) {
                 Pos from, to;
-                prop_to_pos(ctx, dynser::util::remove_prefix(props, "from"), from);
-                prop_to_pos(ctx, dynser::util::remove_prefix(props, "to"), to);
+                prop_to_pos(ctx, remove_prefix(props, "from"), from);
+                prop_to_pos(ctx, remove_prefix(props, "to"), to);
                 out = { from, to };
             },
             [&](this auto const& self, dynser::Context& ctx, dynser::Properties&& props, std::vector<int>& out) {
                 auto last_element = props["last-element"].as_i32();
                 while (props.contains("element")) {
                     out.push_back(props["element"].as_i32());
-                    props = dynser::util::remove_prefix(props, "next");
+                    props = remove_prefix(props, "next");
                 }
                 out.push_back(last_element);
             },
@@ -114,7 +120,7 @@ auto get_dynser_instance() noexcept
         dynser::TargetToPropertyMapper{
             bar_to_prop,
             [&](dynser::Context& ctx, const Foo& target) {
-                return bar_to_prop(ctx, target.bar) + dynser::Properties{
+                return add_prefix(bar_to_prop(ctx, target.bar), "bar") << dynser::Properties{
                     { "dot-stopped", dynser::PropertyValue{ target.dot } },
                     { "len-stopped", dynser::PropertyValue{ target.dyn } },
                 };
@@ -124,8 +130,8 @@ auto get_dynser_instance() noexcept
             },
             pos_to_prop,
             [&](dynser::Context& ctx, const Input& target) {
-                return dynser::util::add_prefix(pos_to_prop(ctx, target.from), "from") +    // clang-format comment
-                       dynser::util::add_prefix(pos_to_prop(ctx, target.to), "to");
+                return add_prefix(pos_to_prop(ctx, target.from), "pos", "from")
+                       << add_prefix(pos_to_prop(ctx, target.to), "pos", "to");
             },
             [&](dynser::Context& ctx, const std::vector<int>& target) {
                 dynser::Properties result;
@@ -138,7 +144,7 @@ auto get_dynser_instance() noexcept
                     auto val = dynser::PropertyValue{ target[ind] };
                     dynser::Properties val_prop{ { "element", val } };
                     for (std::size_t i{}; i < cnt; ++i) {
-                        val_prop = dynser::util::add_prefix(val_prop, "next");
+                        val_prop = add_prefix(val_prop, "next");
                     }
                     result.merge(val_prop);
                     ++cnt;
@@ -162,14 +168,9 @@ auto get_dynser_instance() noexcept
 
                 return result;
             },
-            [&](dynser::Context&, const Quux& target) -> dynser::Properties {
-                return { { "value", dynser::PropertyValue{ target.value } } };
-            },
-            [&](dynser::Context&, const Quuux& target) -> dynser::Properties {
-                return dynser::Properties{ { "value", dynser::PropertyValue{ target.value } } } +
-                       dynser::util::add_prefix(
-                           dynser::Properties{ { "value", dynser::PropertyValue{ target.value } } }, "quux"
-                       );
+            quux_to_prop,
+            [&](dynser::Context& ctx, const Quuux& target) -> dynser::Properties {
+                return map_to_props("value", target.value) << add_prefix(quux_to_prop(ctx, target.quux), "quux");
             },
         }
     };

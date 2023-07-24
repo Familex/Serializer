@@ -307,7 +307,11 @@ class DynSer
     auto gen_existing_process_helper(const auto& props, const auto& after_script_fields) noexcept
     {
         return [&](const Existing& nested) noexcept -> dynser::SerializeResult {
-            const auto inp = nested.prefix ? util::remove_prefix(props, *nested.prefix) : props;
+            // remove prefix if exists
+            const auto without_prefix =
+                nested.prefix ? util::remove_prefix(props, *nested.prefix) : props;
+            // replace parent props with child (existing) props
+            const auto inp = util::remove_prefix(without_prefix, nested.tag) << without_prefix;
             const auto serialize_result = this->serialize_props(inp, nested.tag);
             if (!serialize_result &&
                 std::holds_alternative<serialize_err::ScriptVariableNotFound>(serialize_result.error().error) &&
@@ -531,39 +535,42 @@ public:
                 std::string result;
 
                 // max length of property lists
-                // FIXME remove unwrap
                 // FIXME is priority unused?
-                const auto max_len = dynser::details::calc_max_property_lists_len(*config_, props, recurrent)->second;
+                if (const auto calc_lists_len_result =
+                        dynser::details::calc_max_property_lists_len(*config_, props, recurrent))
+                {
+                    const auto max_len = calc_lists_len_result->second;
 
-                for (std::size_t ind{}; ind < max_len; ++ind) {
-                    for (const auto& recurrent_rule : recurrent) {
-                        // split lists in props and fields into current element
-                        auto curr_fields = fields;
-                        if (unflattened_fields.size() > ind) {
-                            curr_fields.merge(unflattened_fields[ind]);
-                        }
-                        auto curr_props = props;
-                        if (unflattened_props_vector.size() > ind) {
-                            for (auto const& [key, val] : unflattened_props_vector[ind]) {
-                                curr_props[key] = val;
+                    for (std::size_t ind{}; ind < max_len; ++ind) {
+                        for (const auto& recurrent_rule : recurrent) {
+                            // split lists in props and fields into current element
+                            auto curr_fields = fields;
+                            if (unflattened_fields.size() > ind) {
+                                curr_fields.merge(unflattened_fields[ind]);
                             }
-                        }
-                        const auto serialized_recurrent = util::visit_one(
-                            recurrent_rule,
-                            gen_existing_process_helper<RecExisting>(curr_props, curr_fields),
-                            gen_linear_process_helper<RecLinear>(curr_props, curr_fields),
-                            [&](const RecInfix& rule) -> SerializeResult {
-                                if (ind == max_len - 1) {
-                                    return "";    // infix rule -> return empty string on last element
+                            auto curr_props = props;
+                            if (unflattened_props_vector.size() > ind) {
+                                for (auto const& [key, val] : unflattened_props_vector[ind]) {
+                                    curr_props[key] = val;
                                 }
-
-                                return gen_linear_process_helper<RecInfix>(curr_props, curr_fields)(rule);
                             }
-                        );
-                        if (!serialized_recurrent) {
-                            return serialized_recurrent;
+                            const auto serialized_recurrent = util::visit_one(
+                                recurrent_rule,
+                                gen_existing_process_helper<RecExisting>(curr_props, curr_fields),
+                                gen_linear_process_helper<RecLinear>(curr_props, curr_fields),
+                                [&](const RecInfix& rule) -> SerializeResult {
+                                    if (ind == max_len - 1) {
+                                        return "";    // infix rule -> return empty string on last element
+                                    }
+
+                                    return gen_linear_process_helper<RecInfix>(curr_props, curr_fields)(rule);
+                                }
+                            );
+                            if (!serialized_recurrent) {
+                                return serialized_recurrent;
+                            }
+                            result += *serialized_recurrent;
                         }
-                        result += *serialized_recurrent;
                     }
                 }
 

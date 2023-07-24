@@ -116,8 +116,6 @@ inline std::optional<Res> as_opt(YAML::Node const& node) noexcept
 
 std::optional<config::Config> config::from_string(const std::string_view sv) noexcept
 {
-    // FIXME add tags to field names to prevent collisions
-
     try {
         using namespace dynser::config;
         using namespace dynser::config::yaml;
