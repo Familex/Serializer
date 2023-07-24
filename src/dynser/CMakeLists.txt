@@ -16,7 +16,7 @@ add_library (
     "regex/structures.h" "regex/structures.cpp"
     "regex/to_string.h" "regex/to_string.cpp"
     "regex/from_string.h" "regex/from_string.cpp"
-    "config/structures.h"
+    "config/structures.h" "config/structures.cpp"
     "config/keywords.h"
 )
 

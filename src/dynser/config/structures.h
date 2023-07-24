@@ -149,6 +149,9 @@ struct Config
 {
     std::string version;
     yaml::Tags tags;
+
+    // merge tags and version from other config
+    void merge(Config&&) noexcept;
 };
 
 }    // namespace dynser::config
