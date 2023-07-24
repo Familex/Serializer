@@ -42,11 +42,9 @@ tags:
     SECTION("'recursive' rule", "[continual] [recursive] [existing] [linear] [required]")
     {
         std::pair<std::vector<int>, std::string> recursives[]{
-            //
             { { 1, 2, 3 }, "[ 1, 2, 3 ]" },
             // { {}, "[  ]" }, // not implemented
             { { -1, -3, 10, 0, 9999 }, "[ -1, -3, 10, 0, 9999 ]" },
-            //
         };
 
         for (auto const& [recursive, expected] : recursives) {

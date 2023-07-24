@@ -45,6 +45,17 @@ struct Input
     auto operator<=>(const Input&) const = default;
 };
 
+struct Quux
+{
+    std::int32_t value;
+};
+
+struct Quuux
+{
+    Quux quux;
+    std::int32_t value;
+};
+
 auto get_dynser_instance() noexcept
 {
     auto const bar_to_prop = [](dynser::Context&, const Bar& target) noexcept {
@@ -91,7 +102,14 @@ auto get_dynser_instance() noexcept
             },
             [&](dynser::Context&, dynser::Properties&& props, std::vector<Pos>& out) {
                 std::unreachable();    // not implemented
-            } },
+            },
+            [&](dynser::Context&, dynser::Properties&& props, Quux& out) {
+                std::unreachable();    // not implemented
+            },
+            [&](dynser::Context&, dynser::Properties&& props, Quuux& out) {
+                std::unreachable();    // not implemented
+            },
+        },
         // serialization
         dynser::TargetToPropertyMapper{
             bar_to_prop,
@@ -143,6 +161,15 @@ auto get_dynser_instance() noexcept
                 }
 
                 return result;
+            },
+            [&](dynser::Context&, const Quux& target) -> dynser::Properties {
+                return { { "value", dynser::PropertyValue{ target.value } } };
+            },
+            [&](dynser::Context&, const Quuux& target) -> dynser::Properties {
+                return dynser::Properties{ { "value", dynser::PropertyValue{ target.value } } } +
+                       dynser::util::add_prefix(
+                           dynser::Properties{ { "value", dynser::PropertyValue{ target.value } } }, "quux"
+                       );
             },
         }
     };

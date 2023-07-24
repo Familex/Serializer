@@ -1,6 +1,6 @@
 #include "common.hpp"
 
-TEST_CASE("Continual rule")
+TEST_CASE("Continual rule #0")
 {
     using namespace dynser_test;
 
@@ -124,6 +124,50 @@ tags:
 
         for (const auto& [input, expected] : inputs) {
             DYNSER_TEST_SERIALIZE(input, "input", expected);
+        }
+    }
+}
+
+TEST_CASE("Overlapping properties")
+{
+    using namespace dynser_test;
+
+    const auto config = R"##(---
+version: ''
+tags:
+  - name: quux
+    continual:
+      - linear: { pattern: '-?\d+', fields: { 0: value } }
+    serialization-script: |
+      out['value'] = tostring(inp['value']:as_i32())
+  
+  - name: quuux
+    continual:
+      - existing: { tag: "quux" }
+      - linear: { pattern: ' ## ' }
+      - linear: { pattern: '-?\d+', fields: { 0: value } }
+    serialization-script: |
+      out['value'] = tostring(inp['value']:as_i32())
+...)##";
+
+    auto ser = get_dynser_instance();
+
+    const auto result = ser.load_config(dynser::config::RawContents{ config });
+
+    INFO("Config: " << config);
+    REQUIRE(result);
+
+    {
+        const std::pair<Quuux, std::string> quuuxs[]{
+            { { { 1 }, 2 }, "1 ## 2" },
+            { { { -1 }, -3 }, "-1 ## -3" },
+            { { { 0 }, 4293291 }, "0 ## 4293291" },
+            { { { -2 }, 328238 }, "-2 ## 328238" },
+            { { { 10 }, 10 }, "10 ## 10" },
+        };
+
+        for (const auto& [quuux, expected] : quuuxs) {
+            DYNSER_TEST_SERIALIZE(quuux, "quuux", expected);
         }
     }
 }
