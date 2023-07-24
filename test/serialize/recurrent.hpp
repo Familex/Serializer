@@ -4,7 +4,42 @@ TEST_CASE("Recurrent rule")
 {
     using namespace dynser_test;
 
-    REQUIRE(trigger_load_dynser_config.load_result);
+    const auto config = R"##(---
+# yaml-language-server: $schema=./schema_2.json
+version: ''
+tags:
+  - name: "pos-list"
+    continual:
+      - linear: { pattern: '\[ ' }
+      - existing: { tag: "pos-list-payload" }
+      - linear: { pattern: ' \]' }
+  - name: "pos-list-payload"
+    recurrent:
+      - linear: { pattern: '\( ' }
+      - existing: { tag: "pos" }
+      - linear: { pattern: ' \)' }
+      - infix: { pattern: ', ' }
+  - name: "pos"
+    continual:
+      - linear:
+          pattern: '(-?\d+), (-?\d+)'
+          fields:
+            1: x
+            2: y
+    serialization-script: |
+      out['x'] = tostring(inp['x']:as_i32())
+      out['y'] = tostring(inp['y']:as_i32())
+    deserialization-script: |
+      out['x'] = tonumber(inp['x'])
+      out['y'] = tonumber(inp['y'])
+...)##";
+
+    auto ser = get_dynser_instance();
+
+    const auto result = ser.load_config(dynser::config::RawContents{ config });
+
+    INFO("Config: " << config);
+    REQUIRE(result);
 
     SECTION("'Pos-list' rule", "[recurrent]")
     {

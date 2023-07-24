@@ -53,6 +53,11 @@ struct Unknown
 struct ConfigNotLoaded
 { };
 
+struct ConfigTagNotFound
+{
+    std::string tag;
+};
+
 struct BranchNotSet
 { };
 
@@ -84,7 +89,8 @@ using Error = std::variant<
     ResolveRegexError,
     BranchNotSet,
     BranchOutOfBounds,
-    ConfigNotLoaded>;
+    ConfigNotLoaded,
+    ConfigTagNotFound>;
 
 }    // namespace serialize_err
 
@@ -354,11 +360,21 @@ public:
       , ttpm{ std::move(ttpm) }
     { }
 
-    template <typename ConfigFile>
-    bool load_config(ConfigFile&& wrapper) noexcept
+    template <typename ConfigWrapper>
+    bool load_config(ConfigWrapper&& wrapper) noexcept
     {
-        if (const auto config = from_file(std::forward<ConfigFile>(wrapper))) {
-            config_ = *config;
+        if (auto config = from_file(std::forward<ConfigWrapper>(wrapper))) {
+            config_ = std::move(*config);
+            return true;
+        }
+        return false;
+    }
+
+    template <typename ConfigWrapper>
+    bool merge_config(ConfigWrapper&& wrapper) noexcept
+    {
+        if (auto config = from_file(std::forward<ConfigWrapper>(wrapper))) {
+            config_->merge(std::move(*config));
             return true;
         }
         return false;
@@ -368,6 +384,9 @@ public:
     {
         if (!config_) {
             return make_serialize_err(serialize_err::ConfigNotLoaded{});
+        }
+        if (!config_->tags.contains(std::string{ tag })) {
+            return make_serialize_err(serialize_err::ConfigTagNotFound{ std::string{ tag } });
         }
 
         using namespace config::yaml;

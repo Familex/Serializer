@@ -27,6 +27,9 @@ struct Printer
             Overload{
                 [](const Unknown&) -> std::string { return "unknown error"; },
                 [](const ConfigNotLoaded&) -> std::string { return "config not loaded"; },
+                [](const ConfigTagNotFound& error) -> std::string {
+                    return std::format("config tag '{}' not found", error.tag);
+                },
                 [](const BranchNotSet&) -> std::string { return "branch not set"; },
                 [](const BranchOutOfBounds& error) -> std::string {
                     return std::format(
@@ -63,7 +66,7 @@ struct Printer
         );
 
         return error_str + ref_str;
-    }
+    }    // namespace dynser_test
 };
 
 }    // namespace dynser_test
