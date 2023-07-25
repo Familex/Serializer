@@ -16,27 +16,70 @@
 
 namespace dynser
 {
-/**
- * \brief receives `void(*)(Context&, Properties&&, Target&)`.
- */
+
+namespace details
+
+{
 template <typename... Fs>
-struct PropertyToTargetMapper : Fs...
+struct OverloadedObject : Fs...
 {
     using Fs::operator()...;
 };
 template <typename... Fs>
-PropertyToTargetMapper(Fs...) -> PropertyToTargetMapper<Fs...>;
+OverloadedObject(Fs...) -> OverloadedObject<Fs...>;
+
+template <typename Result, typename... Args>
+constexpr auto wrap_function_pointer_to_lambda(Result (*f)(Args...)) noexcept
+{
+    return [=](Args... args) -> Result {
+        return f(std::forward<Args>(args)...);
+    };
+}
+
+template <typename F>
+constexpr auto generate_overloaded_object_helper(F&& f) noexcept
+{
+    if constexpr (std::is_function_v<std::remove_pointer_t<std::decay_t<F>>>) {
+        return wrap_function_pointer_to_lambda(std::forward<F>(f));
+    }
+    else {
+        return std::forward<F>(f);
+    }
+}
+
+template <typename... Fs>
+constexpr auto generate_overloaded_object(Fs&&... fs) noexcept
+{
+    return OverloadedObject{ generate_overloaded_object_helper(std::forward<Fs>(fs))... };
+}
+
+}    // namespace details
 
 /**
- * \brief receives `Properties(*)(Context&, Target&&)`.
+ * \brief must receive `void(*)(Context&, Properties&&, Target&)` functors.
+ * \note generate_* function can be used to constuct this from function pointers (and function objects too).
  */
 template <typename... Fs>
-struct TargetToPropertyMapper : Fs...
-{
-    using Fs::operator()...;
-};
+using PropertyToTargetMapper = details::OverloadedObject<Fs...>;
+
 template <typename... Fs>
-TargetToPropertyMapper(Fs...) -> TargetToPropertyMapper<Fs...>;
+constexpr auto generate_property_to_target_mapper(Fs&&... fs) noexcept
+{
+    return details::generate_overloaded_object(std::forward<Fs>(fs)...);
+}
+
+/**
+ * \brief must receive `Properties(*)(Context&, Target&&)` functors.
+ * \note generate_* function can be used to constuct this from function pointers (and function objects too).
+ */
+template <typename... Fs>
+using TargetToPropertyMapper = details::OverloadedObject<Fs...>;
+
+template <typename... Fs>
+constexpr auto generate_target_to_property_mapper(Fs&&... fs) noexcept
+{
+    return details::generate_overloaded_object(std::forward<Fs>(fs)...);
+}
 
 namespace serialize_err
 {

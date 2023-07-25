@@ -56,42 +56,46 @@ struct Quuux
     std::int32_t value;
 };
 
+auto bar_to_prop(dynser::Context&, const Bar& target) noexcept
+{
+    return dynser::Properties{ { "is-left", dynser::PropertyValue{ target.is_left } } };
+}
+
+auto pos_to_prop(dynser::Context&, const Pos& target) noexcept
+{
+    return dynser::Properties{ { "x", dynser::PropertyValue{ target.x } }, { "y", dynser::PropertyValue{ target.y } } };
+}
+
+auto quux_to_prop(dynser::Context&, const Quux& target) -> dynser::Properties
+{
+    return { { "value", dynser::PropertyValue{ target.value } } };
+}
+
+auto prop_to_bar(dynser::Context&, dynser::Properties&& props, Bar& out) noexcept
+{
+    out = { props["is-left"].as_bool() };
+}
+
+auto prop_to_pos(dynser::Context&, dynser::Properties&& props, Pos& out) noexcept
+{
+    out = { props["x"].as_i32(), props["y"].as_i32() };
+}
+
 auto get_dynser_instance() noexcept
 {
     using namespace dynser::util;
 
-    auto const bar_to_prop = [](dynser::Context&, const Bar& target) noexcept {
-        return dynser::Properties{ { "is-left", dynser::PropertyValue{ target.is_left } } };
-    };
-
-    auto const pos_to_prop = [](dynser::Context&, const Pos& target) noexcept {
-        return dynser::Properties{ { "x", dynser::PropertyValue{ target.x } },
-                                   { "y", dynser::PropertyValue{ target.y } } };
-    };
-
-    auto const quux_to_prop = [](dynser::Context&, const Quux& target) -> dynser::Properties {
-        return { { "value", dynser::PropertyValue{ target.value } } };
-    };
-
-    auto const prop_to_bar = [](dynser::Context&, dynser::Properties&& props, Bar& out) noexcept {
-        out = { props["is-left"].as_bool() };
-    };
-
-    auto const prop_to_pos = [](dynser::Context&, dynser::Properties&& props, Pos& out) noexcept {
-        out = { props["x"].as_i32(), props["y"].as_i32() };
-    };
-
     static dynser::DynSer result{
         // deserialization
-        dynser::PropertyToTargetMapper{
-            prop_to_bar,
+        dynser::generate_property_to_target_mapper(
+            &prop_to_bar,
             [&](dynser::Context& ctx, dynser::Properties&& props, Foo& out) {
                 Bar bar;
                 prop_to_bar(ctx, dynser::Properties{ props }, bar);
                 out = { bar, props["dot-stopped"].as_i32(), props["len-stopped"].as_i32() };
             },
             [&](dynser::Context&, dynser::Properties&& props, Baz& out) { out = { props["letter"].as_string() }; },
-            prop_to_pos,
+            &prop_to_pos,
             [&](dynser::Context& ctx, dynser::Properties&& props, Input& out) {
                 Pos from, to;
                 prop_to_pos(ctx, remove_prefix(props, "from"), from);
@@ -114,11 +118,11 @@ auto get_dynser_instance() noexcept
             },
             [&](dynser::Context&, dynser::Properties&& props, Quuux& out) {
                 std::unreachable();    // not implemented
-            },
-        },
+            }
+        ),
         // serialization
-        dynser::TargetToPropertyMapper{
-            bar_to_prop,
+        dynser::generate_target_to_property_mapper(
+            &bar_to_prop,
             [&](dynser::Context& ctx, const Foo& target) {
                 return add_prefix(bar_to_prop(ctx, target.bar), "bar") << dynser::Properties{
                     { "dot-stopped", dynser::PropertyValue{ target.dot } },
@@ -128,7 +132,7 @@ auto get_dynser_instance() noexcept
             [&](dynser::Context&, const Baz& target) {
                 return dynser::Properties{ { "letter", dynser::PropertyValue{ target.letter } } };
             },
-            pos_to_prop,
+            &pos_to_prop,
             [&](dynser::Context& ctx, const Input& target) {
                 return add_prefix(pos_to_prop(ctx, target.from), "pos", "from")
                        << add_prefix(pos_to_prop(ctx, target.to), "pos", "to");
@@ -171,8 +175,8 @@ auto get_dynser_instance() noexcept
             quux_to_prop,
             [&](dynser::Context& ctx, const Quuux& target) -> dynser::Properties {
                 return map_to_props("value", target.value) << add_prefix(quux_to_prop(ctx, target.quux), "quux");
-            },
-        }
+            }
+        )
     };
 
     return result;
