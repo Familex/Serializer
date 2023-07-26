@@ -1,13 +1,10 @@
 #include "to_string.h"
 
+#include "util/visit.hpp"
+
 // regex::to_string impl
 namespace
 {
-template <typename... Fs>
-struct Overload : Fs...
-{
-    using Fs::operator()...;
-};
 
 /**
  * \brief Apply minimal possible quantifier to string.
@@ -99,118 +96,114 @@ dynser::regex::ToStringResult resolve_token(
 {
     using namespace dynser::regex;
 
-    return std::visit(
-        Overload{
-            [&](const Empty& value) -> ToStringResult { return ""; },
-            [&](const WildCard& value) -> ToStringResult { return apply_quantifier(".", value.quantifier); },
-            [&](const Group& value) -> ToStringResult {
-                if (!vals.contains(value.number)) {
-                    return std::unexpected{ ToStringError{ to_string_err::MissingValue{}, value.number } };
+    return dynser::util::visit_one(
+        tok,
+        [&](const Empty& value) -> ToStringResult { return ""; },
+        [&](const WildCard& value) -> ToStringResult { return apply_quantifier(".", value.quantifier); },
+        [&](const Group& value) -> ToStringResult {
+            if (!vals.contains(value.number)) {
+                return std::unexpected{ ToStringError{ to_string_err::MissingValue{}, value.number } };
+            }
+            std::string str_group_val = vals.at(value.number);
+            if (!std::regex_match(str_group_val, value.regex)) {
+                if (auto appropriate_group_val = try_relent(str_group_val, *value.value)) {
+                    str_group_val = std::move(*appropriate_group_val);
                 }
-                std::string str_group_val = vals.at(value.number);
-                if (!std::regex_match(str_group_val, value.regex)) {
-                    if (auto appropriate_group_val = try_relent(str_group_val, *value.value)) {
-                        str_group_val = std::move(*appropriate_group_val);
-                    }
-                    else {
-                        return std::unexpected{ ToStringError{ to_string_err::InvalidValue{ str_group_val },
-                                                               value.number } };    // can't fix wrong group val
-                    }
+                else {
+                    return std::unexpected{ ToStringError{ to_string_err::InvalidValue{ str_group_val },
+                                                           value.number } };    // can't fix wrong group val
                 }
-                cached_group_values[value.number] = str_group_val;
-                return apply_quantifier(str_group_val, value.quantifier);
-            },
-            [&](const NonCapturingGroup& value) -> ToStringResult {
-                const auto result_sus = resolve_regex(*value.value, vals, cached_group_values);
-                if (!result_sus) {
-                    return std::unexpected{ result_sus.error() };
-                }
-                return apply_quantifier(*result_sus, value.quantifier);
-            },
-            [&](const Backreference& value) -> ToStringResult {
-                // future groups can't be inserted (by regex rules, i guess)
-                if (cached_group_values.contains(value.group_number)) {
-                    return apply_quantifier(cached_group_values.at(value.group_number), value.quantifier);
-                }
-                return std::unexpected{ ToStringError{ to_string_err::MissingValue{}, value.group_number } };
-            },
-            [&](const Lookup& value) -> ToStringResult {
-                return resolve_regex(*value.value, vals, cached_group_values);
-            },
-            [&](const CharacterClass& value) -> ToStringResult {
-                // Get most left character and make it actual value
-
-                if (value.characters.empty()) {
-                    return std::unexpected{ ToStringError{
-                        to_string_err::InvalidValue{ value.characters },
-                        static_cast<std::size_t>(-1)    // FIXME Wrong way to handle errors
-                    } };
-                }
-                // Negative character class (like [^a-z])
-                if (value.is_negative) {
-                    return "?";    // FIXME not implemented
-                }
-                // One unescaped symbol, no exceptions, just return it
-                if (value.characters[0] != '\\') {
-                    return apply_quantifier(value.characters.substr(0, 1), value.quantifier);
-                }
-                if (value.characters.size() == 1) {
-                    return std::unexpected{ ToStringError{
-                        to_string_err::InvalidValue{ value.characters },
-                        static_cast<std::size_t>(-1)    // FIXME Wrong way to handle errors
-                    } };
-                }
-                // Escaped character handle
-                const auto escaped_char = value.characters[1];
-                auto result_char{ escaped_char };
-                switch (escaped_char) {
-                    case 'd':
-                        result_char = '0';
-                        break;
-                    case 'D':
-                        result_char = 'D';
-                        break;
-                    case 'w':
-                        result_char = 'w';
-                        break;
-                    case 'W':
-                        result_char = '%';
-                        break;
-                    case 's':
-                        result_char = ' ';
-                        break;
-                    case 'S':
-                        result_char = 'S';
-                        break;
-                    case 't':
-                        result_char = '\t';
-                        break;
-                    case 'r':
-                        result_char = '\r';
-                        break;
-                    case 'n':
-                        result_char = '\n';
-                        break;
-                    case 'v':
-                        result_char = '\v';
-                        break;
-                    case 'f':
-                        result_char = '\f';
-                        break;
-                    case '0':
-                        result_char = '\0';
-                        break;
-                    default:
-                        // Some syntax character or wrong character escaped, pass through
-                        break;
-                }
-                return apply_quantifier(std::string(1, result_char), value.quantifier);
-            },
-            [&](const Disjunction& value) -> ToStringResult {
-                return resolve_token(*value.left, vals, cached_group_values);
-            },
+            }
+            cached_group_values[value.number] = str_group_val;
+            return apply_quantifier(str_group_val, value.quantifier);
         },
-        tok
+        [&](const NonCapturingGroup& value) -> ToStringResult {
+            const auto result_sus = resolve_regex(*value.value, vals, cached_group_values);
+            if (!result_sus) {
+                return std::unexpected{ result_sus.error() };
+            }
+            return apply_quantifier(*result_sus, value.quantifier);
+        },
+        [&](const Backreference& value) -> ToStringResult {
+            // future groups can't be inserted (by regex rules, i guess)
+            if (cached_group_values.contains(value.group_number)) {
+                return apply_quantifier(cached_group_values.at(value.group_number), value.quantifier);
+            }
+            return std::unexpected{ ToStringError{ to_string_err::MissingValue{}, value.group_number } };
+        },
+        [&](const Lookup& value) -> ToStringResult { return resolve_regex(*value.value, vals, cached_group_values); },
+        [&](const CharacterClass& value) -> ToStringResult {
+            // Get most left character and make it actual value
+
+            if (value.characters.empty()) {
+                return std::unexpected{ ToStringError{
+                    to_string_err::InvalidValue{ value.characters },
+                    static_cast<std::size_t>(-1)    // FIXME Wrong way to handle errors
+                } };
+            }
+            // Negative character class (like [^a-z])
+            if (value.is_negative) {
+                return "?";    // FIXME not implemented
+            }
+            // One unescaped symbol, no exceptions, just return it
+            if (value.characters[0] != '\\') {
+                return apply_quantifier(value.characters.substr(0, 1), value.quantifier);
+            }
+            if (value.characters.size() == 1) {
+                return std::unexpected{ ToStringError{
+                    to_string_err::InvalidValue{ value.characters },
+                    static_cast<std::size_t>(-1)    // FIXME Wrong way to handle errors
+                } };
+            }
+            // Escaped character handle
+            const auto escaped_char = value.characters[1];
+            auto result_char{ escaped_char };
+            switch (escaped_char) {
+                case 'd':
+                    result_char = '0';
+                    break;
+                case 'D':
+                    result_char = 'D';
+                    break;
+                case 'w':
+                    result_char = 'w';
+                    break;
+                case 'W':
+                    result_char = '%';
+                    break;
+                case 's':
+                    result_char = ' ';
+                    break;
+                case 'S':
+                    result_char = 'S';
+                    break;
+                case 't':
+                    result_char = '\t';
+                    break;
+                case 'r':
+                    result_char = '\r';
+                    break;
+                case 'n':
+                    result_char = '\n';
+                    break;
+                case 'v':
+                    result_char = '\v';
+                    break;
+                case 'f':
+                    result_char = '\f';
+                    break;
+                case '0':
+                    result_char = '\0';
+                    break;
+                default:
+                    // Some syntax character or wrong character escaped, pass through
+                    break;
+            }
+            return apply_quantifier(std::string(1, result_char), value.quantifier);
+        },
+        [&](const Disjunction& value) -> ToStringResult {
+            return resolve_token(*value.left, vals, cached_group_values);
+        }
     );
 }
 
