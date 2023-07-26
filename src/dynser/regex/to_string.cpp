@@ -104,13 +104,6 @@ dynser::regex::ToStringResult resolve_token(
             [&](const Empty& value) -> ToStringResult { return ""; },
             [&](const WildCard& value) -> ToStringResult { return apply_quantifier(".", value.quantifier); },
             [&](const Group& value) -> ToStringResult {
-                if (!value.is_capturing) {
-                    const auto result_sus = resolve_regex(*value.value, vals, cached_group_values);
-                    if (!result_sus) {
-                        return std::unexpected{ result_sus.error() };
-                    }
-                    return apply_quantifier(*result_sus, value.quantifier);
-                }
                 if (!vals.contains(value.number)) {
                     return std::unexpected{ ToStringError{ to_string_err::MissingValue{}, value.number } };
                 }
@@ -126,6 +119,13 @@ dynser::regex::ToStringResult resolve_token(
                 }
                 cached_group_values[value.number] = str_group_val;
                 return apply_quantifier(str_group_val, value.quantifier);
+            },
+            [&](const NonCapturingGroup& value) -> ToStringResult {
+                const auto result_sus = resolve_regex(*value.value, vals, cached_group_values);
+                if (!result_sus) {
+                    return std::unexpected{ result_sus.error() };
+                }
+                return apply_quantifier(*result_sus, value.quantifier);
             },
             [&](const Backreference& value) -> ToStringResult {
                 // future groups can't be inserted (by regex rules, i guess)

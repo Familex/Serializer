@@ -23,6 +23,7 @@ using Token = std::variant<
     struct Empty,
     struct WildCard,
     struct Group,
+    struct NonCapturingGroup,
     struct Backreference,
     struct Lookup,
     struct CharacterClass,
@@ -40,30 +41,38 @@ struct WildCard
 struct Group
 {
     const std::unique_ptr<struct Regex> value;
-    const bool is_capturing;
     const Quantifier quantifier;
 
     // to vals check in regex::to_string
     const std::regex regex;
-#ifdef _DEBUG
-    const std::string regex_str;
-#endif
 
     // generated in regex::from_string
     const std::size_t number;
 
     explicit Group(
         std::unique_ptr<struct Regex>&& value,
-        bool is_capturing,
         Quantifier&& quantifier,
         std::regex&& regex,
-#ifdef _DEBUG
-        std::string&& regex_str,
-#endif
-        std::size_t number = 0ull
+        std::size_t number
     ) noexcept;
     explicit Group(Group&& other) noexcept = default;
     Group(const Group& other) noexcept;
+};
+
+struct NonCapturingGroup
+{
+    const std::unique_ptr<struct Regex> value;
+    const Quantifier quantifier;
+
+    const std::regex regex;
+
+    explicit NonCapturingGroup(
+        std::unique_ptr<struct Regex>&& value,
+        Quantifier&& quantifier,
+        std::regex&& regex
+    ) noexcept;
+    explicit NonCapturingGroup(NonCapturingGroup&& other) noexcept = default;
+    NonCapturingGroup(const NonCapturingGroup& other) noexcept;
 };
 
 struct Backreference

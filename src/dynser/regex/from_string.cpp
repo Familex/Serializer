@@ -304,8 +304,12 @@ std::expected<std::pair<dynser::regex::Token, std::size_t>, std::size_t> parse_t
                 return std::unexpected{ token_len };    // missmatched open bracket
             }
             const auto group_len = *group_end_sus - token_len;
-            const auto current_group_number =
-                ++last_group_number;    // remember own group number, 'cause numbering in BFS
+            std::optional<std::size_t> current_group_number{ std::nullopt };    // invalid if non-capturing group
+            if (!is_not_capturing) {
+                // remember own group number, 'cause numbering in BFS
+                ++last_group_number;
+                current_group_number = last_group_number;
+            }
             std::string group_str{ sv.substr(group_start, group_len) };
             auto group_sus = parse_regex(group_str, last_group_number);
             if (!group_sus) {
@@ -320,15 +324,26 @@ std::expected<std::pair<dynser::regex::Token, std::size_t>, std::size_t> parse_t
             }
             auto&& group = std::move(*group_sus);
             token_len += group_len + 1;    // skip ')'
-            return { { Group{ std::make_unique<Regex>(std::move(group)),
-                              !is_not_capturing,
-                              search_quantifier(sv.substr(token_len), &token_len).value_or(without_quantifier),
-                              std::move(regex),
-#ifdef _DEBUG
-                              std::move(group_str),
-#endif
-                              current_group_number },
-                       token_len } };
+            auto quantifier = search_quantifier(sv.substr(token_len), &token_len).value_or(without_quantifier);
+            if (is_not_capturing) {
+                return { { Token{ NonCapturingGroup{
+                               std::make_unique<Regex>(std::move(group)),
+                               std::move(quantifier),
+                               std::move(regex),
+                           } },
+                           token_len } };
+            }
+            else {
+                if (current_group_number) {
+                    return { { Group{ std::make_unique<Regex>(std::move(group)),
+                                      std::move(quantifier),
+                                      std::move(regex),
+                                      *current_group_number },
+                               token_len } };
+                }
+                // current_group_number must be valid in this scope
+                std::unreachable();
+            }
         }
         // string begin (how to handle)
         case '^':

@@ -56,6 +56,21 @@ struct Quuux
     std::int32_t value;
 };
 
+struct VariantStruct
+{
+    struct A
+    {
+        std::int32_t value;
+    };
+    struct B
+    {
+        std::uint32_t value;
+        bool some_bool;
+    };
+
+    std::variant<A, B> value;
+};
+
 auto bar_to_prop(dynser::Context&, const Bar& target) noexcept
 {
     return dynser::Properties{ { "is-left", dynser::PropertyValue{ target.is_left } } };
@@ -118,6 +133,9 @@ auto get_dynser_instance() noexcept
             },
             [&](dynser::Context&, dynser::Properties&& props, Quuux& out) {
                 std::unreachable();    // not implemented
+            },
+            [&](dynser::Context&, dynser::Properties&& props, VariantStruct& out) {
+                std::unreachable();    // not implemented
             }
         ),
         // serialization
@@ -175,6 +193,17 @@ auto get_dynser_instance() noexcept
             quux_to_prop,
             [&](dynser::Context& ctx, const Quuux& target) -> dynser::Properties {
                 return map_to_props("value", target.value) << add_prefix(quux_to_prop(ctx, target.quux), "quux");
+            },
+            [&](dynser::Context&, const VariantStruct& target) -> dynser::Properties {
+                return dynser::util::visit_one(
+                    target.value,
+                    [](VariantStruct::A const& a) {    //
+                        return map_to_props("is_a", true, "value", a.value);
+                    },
+                    [](VariantStruct::B const& b) {
+                        return map_to_props("is_a", false, "value", b.value, "some_bool", b.some_bool);
+                    }
+                );
             }
         )
     };

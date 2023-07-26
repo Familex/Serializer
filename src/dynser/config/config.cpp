@@ -83,12 +83,8 @@ regex::ToStringResult config::details::resolve_regex(const yaml::Regex& reg, con
     const auto regex = !vals.contains(0)
                            ? *reg_sus
                            : Regex{ std::vector<Token>{ Group{ std::make_unique<Regex>(std::move(*reg_sus)),
-                                                               true,
                                                                Quantifier{ 1, 1, false },
                                                                std::regex{ reg.data(), reg.size() },
-#ifdef _DEBUG
-                                                               static_cast<std::string>(reg),
-#endif
                                                                0 } } };
     return to_string(regex, vals);
 }
@@ -98,7 +94,7 @@ namespace
 {
 
 template <typename Res>
-inline std::optional<Res> as_opt(YAML::Node const& node) noexcept(false) // throws YAML::BadConversion or anything
+inline std::optional<Res> as_opt(YAML::Node const& node) noexcept(false)    // throws YAML::BadConversion or anything
 {
     if (node.IsDefined()) {
         return node.as<Res>();

@@ -2,35 +2,34 @@
 
 namespace dynser::regex
 {
-Group::Group(
-    std::unique_ptr<Regex>&& value,
-    bool is_capturing,
-    Quantifier&& quantifier,
-    std::regex&& regex,
-#ifdef _DEBUG
-    std::string&& regex_str,
-#endif
-    std::size_t number
-) noexcept
+Group::Group(std::unique_ptr<Regex>&& value, Quantifier&& quantifier, std::regex&& regex, std::size_t number) noexcept
   : value{ std::move(value) }
-  , is_capturing{ is_capturing }
   , quantifier{ std::move(quantifier) }
   , regex{ std::move(regex) }
-#ifdef _DEBUG
-  , regex_str{ std::move(regex_str) }
-#endif
   , number{ number }
 { }
 
 Group::Group(const Group& other) noexcept
   : value{ new Regex{ *other.value } }
-  , is_capturing{ other.is_capturing }
   , quantifier{ other.quantifier }
   , regex{ other.regex }
-#ifdef _DEBUG
-  , regex_str{ other.regex_str }
-#endif
   , number{ other.number }
+{ }
+
+NonCapturingGroup::NonCapturingGroup(
+    std::unique_ptr<Regex>&& value,
+    Quantifier&& quantifier,
+    std::regex&& regex
+) noexcept
+  : value{ std::move(value) }
+  , quantifier{ std::move(quantifier) }
+  , regex{ std::move(regex) }
+{ }
+
+NonCapturingGroup::NonCapturingGroup(const NonCapturingGroup& other) noexcept
+  : value{ new Regex{ *other.value } }
+  , quantifier{ other.quantifier }
+  , regex{ other.regex }
 { }
 
 Lookup::Lookup(std::unique_ptr<Regex>&& value, bool is_negative, bool is_forward) noexcept
