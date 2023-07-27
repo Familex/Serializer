@@ -16,7 +16,7 @@ struct Quantifier
     std::optional<std::size_t> to;
     bool is_lazy;
 
-    constexpr inline auto operator<=>(const Quantifier&) const noexcept = default;
+    constexpr inline auto operator<=>(Quantifier const&) const noexcept = default;
 } inline const without_quantifier{ 1, 1, false };
 
 using Token = std::variant<
@@ -35,83 +35,83 @@ struct Empty
 // fullstop symbol
 struct WildCard
 {
-    const Quantifier quantifier;
+    Quantifier quantifier;
 };
 
 struct Group
 {
-    const std::unique_ptr<struct Regex> value;
-    const Quantifier quantifier;
+    std::unique_ptr<struct Regex const> value;
+    Quantifier quantifier;
 
     // to vals check in regex::to_string
-    const std::regex regex;
+    std::regex regex;
 
     // generated in regex::from_string
-    const std::size_t number;
+    std::size_t number;
 
     explicit Group(
-        std::unique_ptr<struct Regex>&& value,
+        std::unique_ptr<struct Regex const>&& value,
         Quantifier&& quantifier,
         std::regex&& regex,
         std::size_t number
     ) noexcept;
-    explicit Group(Group&& other) noexcept = default;
-    Group(const Group& other) noexcept;
+    Group(Group&&) noexcept = default;
+    Group(Group const& other) noexcept;
 };
 
 struct NonCapturingGroup
 {
-    const std::unique_ptr<struct Regex> value;
-    const Quantifier quantifier;
+    std::unique_ptr<struct Regex const> value;
+    Quantifier quantifier;
 
-    const std::regex regex;
+    std::regex regex;
 
     explicit NonCapturingGroup(
-        std::unique_ptr<struct Regex>&& value,
+        std::unique_ptr<struct Regex const>&& value,
         Quantifier&& quantifier,
         std::regex&& regex
     ) noexcept;
-    explicit NonCapturingGroup(NonCapturingGroup&& other) noexcept = default;
-    NonCapturingGroup(const NonCapturingGroup& other) noexcept;
+    NonCapturingGroup(NonCapturingGroup&& other) noexcept = default;
+    NonCapturingGroup(NonCapturingGroup const& other) noexcept;
 };
 
 struct Backreference
 {
-    const std::size_t group_number;
-    const Quantifier quantifier;
+    std::size_t group_number;
+    Quantifier quantifier;
 };
 
 struct Lookup
 {
-    const std::unique_ptr<struct Regex> value;
-    const bool is_negative;
-    const bool is_forward;    // true if forward lookup, false if backward
+    std::unique_ptr<struct Regex const> value;
+    bool is_negative;
+    bool is_forward;    // true if forward lookup, false if backward
 
-    explicit Lookup(std::unique_ptr<struct Regex>&& value, bool is_negative, bool is_forward) noexcept;
-    explicit Lookup(Lookup&& other) noexcept = default;
-    Lookup(const Lookup& other) noexcept;
+    explicit Lookup(std::unique_ptr<struct Regex const>&& value, bool is_negative, bool is_forward) noexcept;
+    Lookup(Lookup&&) noexcept = default;
+    Lookup(Lookup const& other) noexcept;
 };
 
 struct CharacterClass
 {
-    const std::string characters;    // raw (without negation '^' symbol)
-    const bool is_negative;
-    const Quantifier quantifier;
+    std::string characters;    // raw (without negation '^' symbol)
+    bool is_negative;
+    Quantifier quantifier;
 };
 
 struct Disjunction
 {
-    const std::unique_ptr<Token> left;
-    const std::unique_ptr<Token> right;
+    std::unique_ptr<Token const> left;
+    std::unique_ptr<Token const> right;
 
-    explicit Disjunction(std::unique_ptr<Token>&& left, std::unique_ptr<Token>&& right) noexcept;
-    explicit Disjunction(Disjunction&& other) noexcept = default;
-    Disjunction(const Disjunction& other) noexcept;
+    explicit Disjunction(std::unique_ptr<Token const>&& left, std::unique_ptr<Token const>&& right) noexcept;
+    Disjunction(Disjunction&&) noexcept = default;
+    Disjunction(Disjunction const& other) noexcept;
 };
 
 struct Regex
 {
-    const std::vector<Token> value;
+    std::vector<Token> value;
 };
 
 }    // namespace dynser::regex
