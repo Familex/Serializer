@@ -185,6 +185,10 @@ std::expected<std::pair<dynser::regex::Token, std::size_t>, std::size_t> parse_t
         // escaped character
         case '\\':
             ++token_len;
+            if (sv.size() <= token_len) {
+                // backslash at the end of string (nothing to escape)
+                return std::unexpected{ token_len };
+            }
             if (std::isdigit(sv[token_len])) {
                 const auto backref = static_cast<std::size_t>(*svtoi(sv.substr(token_len)));
                 token_len += number_len(backref);

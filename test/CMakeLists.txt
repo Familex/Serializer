@@ -34,6 +34,7 @@ add_executable (
     serialize/branched.hpp
     serialize/recursive.hpp
     serialize/recurrent.hpp
+    serialize/error_cases.hpp
 
     serialize/tests.cpp
 )
