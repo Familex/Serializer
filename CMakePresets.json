@@ -18,6 +18,13 @@
       }
     },
     {
+      "name": "test-base",
+      "hidden": true,
+      "cacheVariables": {
+        "DYNSER_BUILD_TESTS": "ON"
+      }
+    },
+    {
       "name": "x64-debug",
       "displayName": "x64 Debug",
       "inherits": [ "windows-base" ],
@@ -32,11 +39,7 @@
     {
       "name": "x64-debug-tests",
       "displayName": "x64 Debug Tests",
-      "inherits": [ "x64-debug" ],
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "DYNSER_BUILD_TESTS": "ON"
-      }
+      "inherits": [ "x64-debug", "test-base" ]
     },
     {
       "name": "x64-release",
@@ -49,11 +52,7 @@
     {
       "name": "x64-release-tests",
       "displayName": "x64 Release Tests",
-      "inherits": [ "x64-release" ],
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "DYNSER_BUILD_TESTS": "ON"
-      }
+      "inherits": [ "x64-release", "test-base" ]
     }
   ]
 }
