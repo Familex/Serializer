@@ -25,10 +25,20 @@ add_executable (
 )
 
 add_executable (
+    benchmark-tests
+
+    util/printer.hpp
+
+    benchmark/serialize.hpp
+
+    benchmark/tests.cpp
+)
+
+add_executable (
     serialize-tests
 
     serialize/common.hpp
-    serialize/printer.hpp
+    util/printer.hpp
 
     serialize/continual.hpp
     serialize/branched.hpp
@@ -45,8 +55,17 @@ add_executable (
     catch/catch_test.cpp
 )
 
-set ("tests" "internal-tests" "serialize-tests" "catch-test")
-set ("dynser-tests" "internal-tests" "serialize-tests")
+set ("include-util-dir" "serialize-tests" "benchmark-tests")
+set ("tests" "internal-tests" "benchmark-tests" "serialize-tests" "catch-test")
+set ("dynser-tests" "internal-tests" "benchmark-tests" "serialize-tests")
+
+foreach (targ ${include-util-dir})
+    target_include_directories (
+        ${targ}
+        PRIVATE
+        "util/"
+    )
+endforeach ()
 
 foreach (targ ${dynser-tests})
     target_link_libraries (

@@ -323,8 +323,15 @@ std::expected<std::pair<dynser::regex::Token, std::size_t>, std::size_t> parse_t
             try {
                 regex = std::regex{ group_str.data(), group_str.size() };
             }
-            catch (const std::regex_error&) {
-                return std::unexpected{ group_start };
+            catch (const std::regex_error& regex_error) {
+                if (regex_error.code() == std::regex_constants::error_backref) {
+                    // FIXME cases like '(([smth])\2)\1' must be handled
+                    // separately cause if we are in 1st group in this
+                    // function, then backreference \2 is invalid
+                }
+                else {
+                    return std::unexpected{ group_start };
+                }
             }
             auto&& group = std::move(*group_sus);
             token_len += group_len + 1;    // skip ')'
