@@ -3,9 +3,9 @@ cmake_minimum_required (VERSION 3.8)
 include (FetchContent)
 
 FetchContent_Declare (
-  Catch2
-  GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-  GIT_TAG        v3.4.0
+    Catch2
+    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+    GIT_TAG        v3.4.0
 )
 
 FetchContent_MakeAvailable (Catch2)
@@ -45,6 +45,7 @@ add_executable (
     serialize/recursive.hpp
     serialize/recurrent.hpp
     serialize/error_cases.hpp
+    serialize/regex.hpp
 
     serialize/tests.cpp
 )

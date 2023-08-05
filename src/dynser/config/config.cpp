@@ -208,6 +208,12 @@ config::ParseResult config::from_string(const std::string_view sv) noexcept
 
                         return nested;
                     }
+                    else if (const auto recurrent_dict = tag[keywords::NESTED_RECURRENTDICT]) {
+                        return RecurrentDict{
+                            .key = recurrent_dict[keywords::RECURRENTDICT_KEY].as<std::string>(),
+                            .tag = recurrent_dict[keywords::RECURRENTDICT_TAG].as<std::string>(),
+                        };
+                    }
 
                     std::unreachable();
                 }(),

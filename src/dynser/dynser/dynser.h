@@ -56,7 +56,7 @@ constexpr auto generate_overloaded_object(Fs&&... fs) noexcept
 }    // namespace details
 
 /**
- * \brief must receive `void(*)(Context&, Properties&&, Target&)` functors.
+ * \brief must receive `void(*)(Context&, Properties const&, Target&)` functors.
  * \note generate_* function can be used to constuct this from function pointers (and function objects too).
  */
 template <typename... Fs>
@@ -69,7 +69,7 @@ constexpr auto generate_property_to_target_mapper(Fs&&... fs) noexcept
 }
 
 /**
- * \brief must receive `Properties(*)(Context&, Target&&)` functors.
+ * \brief must receive `Properties(*)(Context&, Target const&)` functors.
  * \note generate_* function can be used to constuct this from function pointers (and function objects too).
  */
 template <typename... Fs>
@@ -119,6 +119,11 @@ struct ResolveRegexError
     regex::ToStringError error;
 };
 
+struct RecurrentDictKeyNotFound
+{
+    std::string key;
+};
+
 using Error = std::variant<
     Unknown,
     ScriptError,
@@ -127,7 +132,8 @@ using Error = std::variant<
     BranchNotSet,
     BranchOutOfBounds,
     ConfigNotLoaded,
-    ConfigTagNotFound>;
+    ConfigTagNotFound,
+    RecurrentDictKeyNotFound>;
 
 }    // namespace serialize_err
 
@@ -144,6 +150,7 @@ struct ErrorRef
 struct SerializeError
 {
     serialize_err::Error error;
+    Properties scope_props;
     std::vector<ErrorRef> ref_seq{};
 };
 
@@ -152,9 +159,17 @@ using SerializeResult = std::expected<std::string, SerializeError>;
 /**
  * \brief helper.
  */
-constexpr SerializeResult make_serialize_err(serialize_err::Error&& err) noexcept
+inline SerializeResult make_serialize_err(serialize_err::Error&& err, Properties scope_props) noexcept
 {
-    return std::unexpected{ SerializeError{ std::move(err), {} } };
+    return std::unexpected{ SerializeError{ std::move(err), std::move(scope_props), {} } };
+}
+
+/**
+ * \brief helper.
+ */
+void append_ref_to_err(SerializeError& err, ErrorRef&& error_ref) noexcept
+{
+    err.ref_seq.push_back(std::move(error_ref));
 }
 
 namespace details
@@ -213,6 +228,10 @@ std::optional<PrioritizedListLen> calc_max_property_lists_len_helper(
 ) noexcept
 {
     using namespace config::yaml;
+
+    if (!config.tags.contains(rule.tag)) {
+        return std::nullopt;
+    }
 
     auto result = calc_max_property_lists_len(config, props, config.tags.at(rule.tag).nested);
 
@@ -293,7 +312,7 @@ std::optional<PrioritizedListLen> calc_max_property_lists_len(
                 if (rule_result) {
                     if (!result ||                               //
                         rule_result->first > result->first ||    //
-                        rule_result->first == result->first && rule_result->second > result->second)
+                        (rule_result->first == result->first && rule_result->second > result->second))
                     {
                         result = *rule_result;
                     }
@@ -301,8 +320,14 @@ std::optional<PrioritizedListLen> calc_max_property_lists_len(
             }
         };
 
+    // FIXME infix rule must be -1?
     util::visit_one(
         rules,
+        [&result, &props](RecurrentDict const& recurrent_dict) {
+            if (props.contains(recurrent_dict.key)) {
+                result = { 0, props.at(recurrent_dict.key).as_const_list().size() };
+            }
+        },
         [&](Branched const& branched) {    //
             visit_vector_of_existing_or_linear_rules(branched.rules);
         },
@@ -347,6 +372,7 @@ class DynSer
             // remove prefix if exists
             const auto without_prefix = nested.prefix ? util::remove_prefix(props, *nested.prefix) : props;
             // replace parent props with child (existing) props
+            // FIXME not obvious behavior, must be documented at least
             const auto inp = util::remove_prefix(without_prefix, nested.tag) << without_prefix;
             const auto serialize_result = this->serialize_props(inp, nested.tag);
             if (!serialize_result &&
@@ -379,12 +405,12 @@ class DynSer
                                               : std::expected<GroupValues, std::string>{ GroupValues{} };
             if (!regex_fields_sus) {
                 // failed to merge script variables (script not set all variables or failed to execute)
-                return make_serialize_err(serialize_err::ScriptVariableNotFound{ regex_fields_sus.error() });
+                return make_serialize_err(serialize_err::ScriptVariableNotFound{ regex_fields_sus.error() }, props);
             }
             const auto to_string_result = config::details::resolve_regex(pattern, *regex_fields_sus);
 
             if (!to_string_result) {
-                return make_serialize_err(serialize_err::ResolveRegexError{ to_string_result.error() });
+                return make_serialize_err(serialize_err::ResolveRegexError{ to_string_result.error() }, props);
             }
             return *to_string_result;
         };
@@ -423,10 +449,10 @@ public:
     SerializeResult serialize_props(const Properties& props, const std::string_view tag) noexcept
     {
         if (!config_) {
-            return make_serialize_err(serialize_err::ConfigNotLoaded{});
+            return make_serialize_err(serialize_err::ConfigNotLoaded{}, props);
         }
         if (!config_->tags.contains(std::string{ tag })) {
-            return make_serialize_err(serialize_err::ConfigTagNotFound{ std::string{ tag } });
+            return make_serialize_err(serialize_err::ConfigTagNotFound{ std::string{ tag } }, props);
         }
 
         using namespace config::yaml;
@@ -434,7 +460,9 @@ public:
 
         // input: { 'a': 0, 'b': [ 1, 2, 3 ] }
         // output: ( { 'a': 0 }, [ { 'b': 1 }, { 'b': 2 }, { 'b': 3 } ] )
-        const auto [non_list_props, unflattened_props_vector] =
+        dynser::Properties non_list_props;
+        std::vector<dynser::Properties> unflattened_props_vector;
+        std::tie(non_list_props, unflattened_props_vector) =
             [](Properties const& props) -> std::pair<Properties, std::vector<Properties>> {    // iife
             std::vector<Properties> unflattened_props;
             Properties non_list_props;
@@ -475,7 +503,7 @@ public:
                 const auto script_run_result = state.runString(script->c_str());
                 if (script_run_result != LUA_OK) {
                     const auto error = state.read<std::string>(-1);
-                    return std::unexpected{ dynser::SerializeError{ serialize_err::ScriptError{ error }, {} } };
+                    return std::unexpected{ SerializeError{ serialize_err::ScriptError{ error }, props } };
                 }
             }
             return state[keywords::OUTPUT_TABLE].read<dynser::Fields>();
@@ -485,7 +513,7 @@ public:
         if (!non_list_props.empty()) {
             auto non_list_fields_sus = props_to_fields(state, non_list_props, tag_config);
             if (!non_list_fields_sus) {
-                return make_serialize_err(std::move(non_list_fields_sus.error().error));
+                return make_serialize_err(std::move(non_list_fields_sus.error().error), props);
             }
             fields = *non_list_fields_sus;
         }    // else only list-fields
@@ -493,18 +521,19 @@ public:
         // input (unflattened_props_vector): [ { 'b': 1 }, { 'b': 2 }, { 'b': 3 } ]
         // output (unflattened_fields): [ { 'b': '1' }, { 'b': '2' }, { 'b': '3' } ]
         std::vector<Fields> unflattened_fields;    // for recurrent
-        if (!unflattened_props_vector.empty()) {
+        // FIXME realization looks bad, especially this check
+        if (std::holds_alternative<Recurrent>(tag_config.nested) && !unflattened_props_vector.empty()) {
             for (auto const& unflattened_props : unflattened_props_vector) {
                 auto unflattened_fields_sus = props_to_fields(state, unflattened_props, tag_config);
                 if (!unflattened_fields_sus) {
-                    return make_serialize_err(std::move(unflattened_fields_sus.error().error));
+                    return make_serialize_err(std::move(unflattened_fields_sus.error().error), props);
                 }
                 unflattened_fields.push_back(*unflattened_fields_sus);
             }
         }
 
         // nested
-        return util::visit_one(
+        return util::visit_one_terminated(
             tag_config.nested,
             [&](const Continual& continual) -> SerializeResult {
                 using namespace config::details;
@@ -513,15 +542,14 @@ public:
                 for (std::size_t rule_ind{}; rule_ind < continual.size(); ++rule_ind) {
                     const auto& rule = continual[rule_ind];
 
-                    auto serialized_continual = util::visit_one(
+                    auto serialized_continual = util::visit_one_terminated(
                         rule,
                         gen_existing_process_helper<ConExisting>(props, fields),
                         gen_linear_process_helper<ConLinear>(props, fields)
                     );
                     if (!serialized_continual) {
-                        serialized_continual.error().ref_seq.emplace_back(
-                            std::string{ tag }, rule_ind
-                        );    // add ref to outside rule
+                        // add ref to outside rule
+                        append_ref_to_err(serialized_continual.error(), { std::string{ tag }, rule_ind });
                         return serialized_continual;
                     }
                     result += *serialized_continual;
@@ -542,28 +570,32 @@ public:
                     branched_script_state.runString(branched.branching_script.c_str());
                 if (branched_script_run_result != LUA_OK) {
                     const auto error = branched_script_state.read<std::string>(-1);
-                    return make_serialize_err(serialize_err::ScriptError{ error });
+                    return make_serialize_err(serialize_err::ScriptError{ error }, props);
                 }
                 const auto branched_rule_ind = branched_script_state[keywords::BRANCHED_RULE_IND_VARIABLE].read<int>();
                 if (branched_rule_ind == BRANCHED_RULE_IND_ERRVAL) {
-                    return make_serialize_err(serialize_err::BranchNotSet{});
+                    return make_serialize_err(serialize_err::BranchNotSet{}, props);
                 }
                 if (branched_rule_ind >= branched.rules.size()) {
-                    return make_serialize_err(serialize_err::BranchOutOfBounds{
-                        .selected_branch = static_cast<std::uint32_t>(branched_rule_ind),
-                        .max_branch = branched.rules.size() - 1 });
+                    return make_serialize_err(
+                        serialize_err::BranchOutOfBounds{ .selected_branch =
+                                                              static_cast<std::uint32_t>(branched_rule_ind),
+                                                          .max_branch = branched.rules.size() - 1 },
+                        props
+                    );
                 }
 
-                auto serialized_branched = util::visit_one(
+                auto serialized_branched = util::visit_one_terminated(
                     branched.rules[branched_rule_ind],
                     gen_existing_process_helper<BraExisting>(props, fields),
                     gen_linear_process_helper<BraLinear>(props, fields)
                 );
 
                 if (!serialized_branched) {
-                    serialized_branched.error().ref_seq.emplace_back(
-                        std::string{ tag }, branched_rule_ind
-                    );    // add ref to outside rule
+                    // add ref to outside rule
+                    append_ref_to_err(
+                        serialized_branched.error(), { std::string{ tag }, static_cast<std::size_t>(branched_rule_ind) }
+                    );
                 }
                 return serialized_branched;
             },
@@ -590,7 +622,7 @@ public:
                                     curr_props[key] = val;
                                 }
                             }
-                            const auto serialized_recurrent = util::visit_one(
+                            const auto serialized_recurrent = util::visit_one_terminated(
                                 recurrent_rule,
                                 gen_existing_process_helper<RecExisting>(curr_props, curr_fields),
                                 gen_linear_process_helper<RecLinear>(curr_props, curr_fields),
@@ -611,6 +643,27 @@ public:
                 }
 
                 return result;
+            },
+            [&](const RecurrentDict& recurrent_dict) -> SerializeResult {
+                std::string result;
+
+                if (!props.contains(recurrent_dict.key)) {
+                    return make_serialize_err(serialize_err::RecurrentDictKeyNotFound{ recurrent_dict.key }, props);
+                }
+                for (std::size_t ind{}; auto const& dict : props.at(recurrent_dict.key).as_const_list()) {
+                    auto serialize_result = serialize_props(dict.as_const_map(), recurrent_dict.tag);
+
+                    if (!serialize_result) {
+                        append_ref_to_err(serialize_result.error(), { std::string{ tag }, ind });
+
+                        return serialize_result;
+                    }
+
+                    result += *serialize_result;
+
+                    ++ind;
+                }
+                return result;
             }
         );
     }
@@ -619,7 +672,7 @@ public:
     SerializeResult serialize(const Target& target, const std::string_view tag) noexcept
     {
         if (!config_) {
-            return make_serialize_err(serialize_err::ConfigNotLoaded{});
+            return make_serialize_err(serialize_err::ConfigNotLoaded{}, {});
         }
 
         return serialize_props(ttpm(context, target), tag);

@@ -106,10 +106,13 @@ struct Branched
     using Rules = std::variant<BraExisting, BraLinear>;
     std::vector<Rules> rules;
 };
+struct RecurrentDict
+{
+    std::string key;
+    std::string tag;
+};
 
-using Nested = std::variant<Continual, Recurrent, Branched>;
-template <typename Rule>
-concept NestedConcept = std::same_as<Rule, Continual> || std::same_as<Rule, Recurrent> || std::same_as<Rule, Branched>;
+using Nested = std::variant<Continual, Recurrent, Branched, RecurrentDict>;
 
 struct Tag
 {

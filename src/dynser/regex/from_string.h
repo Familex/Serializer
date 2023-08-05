@@ -7,7 +7,12 @@
 namespace dynser::regex
 {
 
+// error position
+using ParseError = std::size_t;
+
+using ParseResult = std::expected<Regex, ParseError>;
+
 // error position if error
-std::expected<Regex, std::size_t> from_string(const std::string_view sv) noexcept;
+ParseResult from_string(const std::string_view sv) noexcept;
 
 }    // namespace dynser::regex

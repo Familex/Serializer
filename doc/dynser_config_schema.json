@@ -245,6 +245,24 @@
               }
             }
           },
+          "recurrent-dict": {
+            "type": "object",
+            "description": "iterates over dictionaries in lists property",
+            "required": [
+              "key",
+              "tag"
+            ],
+            "properties": {
+              "key": {
+                "type": "string",
+                "description": "dictionary list property key"
+              },
+              "tag": {
+                "type": "string",
+                "description": "existing tag name to handle dictionaries"
+              }
+            }
+          },
           "serialization-script": {
             "type": "string",
             "description": "lua script for properties to fields conversion"

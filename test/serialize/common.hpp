@@ -86,14 +86,14 @@ auto quux_to_prop(dynser::Context&, const Quux& target) -> dynser::Properties
     return { { "value", dynser::PropertyValue{ target.value } } };
 }
 
-auto prop_to_bar(dynser::Context&, dynser::Properties&& props, Bar& out) noexcept
+auto prop_to_bar(dynser::Context&, dynser::Properties const& props, Bar& out) noexcept
 {
-    out = { props["is-left"].as_bool() };
+    out = { props.at("is-left").as_const_bool() };
 }
 
-auto prop_to_pos(dynser::Context&, dynser::Properties&& props, Pos& out) noexcept
+auto prop_to_pos(dynser::Context&, dynser::Properties const& props, Pos& out) noexcept
 {
-    out = { props["x"].as_i32(), props["y"].as_i32() };
+    out = { props.at("x").as_const_i32(), props.at("y").as_const_i32() };
 }
 
 auto get_dynser_instance() noexcept
@@ -104,37 +104,40 @@ auto get_dynser_instance() noexcept
         // deserialization
         dynser::generate_property_to_target_mapper(
             &prop_to_bar,
-            [&](dynser::Context& ctx, dynser::Properties&& props, Foo& out) {
+            [&](dynser::Context& ctx, dynser::Properties const& props, Foo& out) {
                 Bar bar;
                 prop_to_bar(ctx, dynser::Properties{ props }, bar);
-                out = { bar, props["dot-stopped"].as_i32(), props["len-stopped"].as_i32() };
+                out = { bar, props.at("dot-stopped").as_const_i32(), props.at("len-stopped").as_const_i32() };
             },
-            [&](dynser::Context&, dynser::Properties&& props, Baz& out) { out = { props["letter"].as_string() }; },
+            [&](dynser::Context&, dynser::Properties const& props, Baz& out) {
+                out = { props.at("letter").as_const_string() };
+            },
             &prop_to_pos,
-            [&](dynser::Context& ctx, dynser::Properties&& props, Input& out) {
+            [&](dynser::Context& ctx, dynser::Properties const& props, Input& out) {
                 Pos from, to;
                 prop_to_pos(ctx, remove_prefix(props, "from"), from);
                 prop_to_pos(ctx, remove_prefix(props, "to"), to);
                 out = { from, to };
             },
-            [&](this auto const& self, dynser::Context& ctx, dynser::Properties&& props, std::vector<int>& out) {
-                auto last_element = props["last-element"].as_i32();
-                while (props.contains("element")) {
-                    out.push_back(props["element"].as_i32());
-                    props = remove_prefix(props, "next");
+            [&](dynser::Context& ctx, dynser::Properties const& props, std::vector<int>& out) {
+                auto props_tmp = props;
+                auto last_element = props_tmp.at("last-element").as_const_i32();
+                while (props_tmp.contains("element")) {
+                    out.push_back(props_tmp.at("element").as_const_i32());
+                    props_tmp = remove_prefix(props_tmp, "next");
                 }
                 out.push_back(last_element);
             },
-            [&](dynser::Context&, dynser::Properties&& props, std::vector<Pos>& out) {
+            [&](dynser::Context&, dynser::Properties const& props, std::vector<Pos>& out) {
                 std::unreachable();    // not implemented
             },
-            [&](dynser::Context&, dynser::Properties&& props, Quux& out) {
+            [&](dynser::Context&, dynser::Properties const& props, Quux& out) {
                 std::unreachable();    // not implemented
             },
-            [&](dynser::Context&, dynser::Properties&& props, Quuux& out) {
+            [&](dynser::Context&, dynser::Properties const& props, Quuux& out) {
                 std::unreachable();    // not implemented
             },
-            [&](dynser::Context&, dynser::Properties&& props, VariantStruct& out) {
+            [&](dynser::Context&, dynser::Properties const& props, VariantStruct& out) {
                 std::unreachable();    // not implemented
             }
         ),
@@ -215,9 +218,6 @@ auto get_dynser_instance() noexcept
     do {                                                                                                               \
         using namespace dynser_test;                                                                                   \
         const auto serialized = ser.serialize(target, tag);                                                            \
-        if (!serialized) {                                                                                             \
-            UNSCOPED_INFO("Serialize error: " << Printer{}.serialize_err_to_string(serialized.error()));               \
-        }                                                                                                              \
         REQUIRE(serialized);                                                                                           \
         CHECK(*serialized == expected);                                                                                \
     } while (false);
@@ -227,9 +227,6 @@ auto get_dynser_instance() noexcept
         using namespace dynser_test;                                                                                   \
         ser.context = context;                                                                                         \
         const auto serialized = ser.serialize(target, tag);                                                            \
-        if (!serialized) {                                                                                             \
-            UNSCOPED_INFO("Serialize error: " << Printer{}.serialize_err_to_string(serialized.error()));               \
-        }                                                                                                              \
         REQUIRE(serialized);                                                                                           \
         CHECK(*serialized == expected);                                                                                \
         ser.context.clear();                                                                                           \
@@ -238,9 +235,6 @@ auto get_dynser_instance() noexcept
 #define DYNSER_LOAD_CONFIG(ser, config)                                                                                \
     do {                                                                                                               \
         const auto load_result = ser.load_config(config);                                                              \
-        if (!load_result) {                                                                                            \
-            UNSCOPED_INFO("Load config error: " << Printer{}.config_parse_err_to_string(load_result.error()));         \
-        }                                                                                                              \
         REQUIRE(load_result);                                                                                          \
     } while (false);
 

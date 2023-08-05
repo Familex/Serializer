@@ -197,7 +197,6 @@ void register_userdata_property_value(luwra::StateWrapper& state) noexcept
             LUWRA_MEMBER(dynser::PropertyValue, is_char),
             LUWRA_MEMBER(dynser::PropertyValue, is_list),
             LUWRA_MEMBER(dynser::PropertyValue, is_map),
-            //
         },
         // meta-members
         {}

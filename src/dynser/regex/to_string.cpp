@@ -96,7 +96,7 @@ dynser::regex::ToStringResult resolve_token(
 {
     using namespace dynser::regex;
 
-    return dynser::util::visit_one(
+    return dynser::util::visit_one_terminated(
         tok,
         [&](const Empty& value) -> ToStringResult { return ""; },
         [&](const WildCard& value) -> ToStringResult { return apply_quantifier(".", value.quantifier); },

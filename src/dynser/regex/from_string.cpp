@@ -173,7 +173,9 @@ std::expected<std::pair<dynser::regex::Token, std::size_t>, std::size_t> parse_t
     std::size_t token_len{};
 
     if (sv.empty()) {
-        return std::unexpected{ token_len };
+        // we can fall in here on '||' regex by example
+        //                          ^^ empty after second disjunction
+        return { { Empty{}, token_len } };
     }
 
     switch (sv[0]) {
@@ -240,15 +242,16 @@ std::expected<std::pair<dynser::regex::Token, std::size_t>, std::size_t> parse_t
         // disjunction
         case '|':
         {
-            auto right_sus = parse_token(sv.substr(1), result, last_group_number);
+            const auto right_start = 1ull;
+            auto right_sus = parse_token(sv.substr(right_start), result, last_group_number);
             if (!right_sus) {
-                return std::unexpected{ right_sus.error() };
+                return std::unexpected{ right_sus.error() + right_start };
             }
             auto&& [right, right_len] = std::move(*right_sus);
             if (result.empty()) {
                 return {
                     { { Disjunction{ std::make_unique<Token>(Empty{}), std::make_unique<Token>(std::move(right)) } },
-                      right_len + 1 }
+                      right_len + right_start }
                 };
             }
             else {
@@ -257,7 +260,7 @@ std::expected<std::pair<dynser::regex::Token, std::size_t>, std::size_t> parse_t
                 return { { Disjunction{ std::make_unique<Token>(std::move(left)),
                                         std::make_unique<Token>(std::move(right)) },
 
-                           right_len + 1 } };
+                           right_len + right_start } };
             }
         }
         // illegal here (regex is context sensitive)
@@ -382,8 +385,7 @@ std::expected<std::pair<dynser::regex::Token, std::size_t>, std::size_t> parse_t
  * \param [in,out] last_group_number last group number in parse process.
  * \return parsed regex.
  */
-std::expected<dynser::regex::Regex, std::size_t>
-parse_regex(const std::string_view sv, std::size_t& last_group_number) noexcept
+dynser::regex::ParseResult parse_regex(const std::string_view sv, std::size_t& last_group_number) noexcept
 {
     using namespace dynser::regex;
 
@@ -402,7 +404,7 @@ parse_regex(const std::string_view sv, std::size_t& last_group_number) noexcept
 }
 }    // namespace
 
-std::expected<dynser::regex::Regex, std::size_t> dynser::regex::from_string(const std::string_view sv) noexcept
+dynser::regex::ParseResult dynser::regex::from_string(const std::string_view sv) noexcept
 {
     // lvalue-reference to [in,out] param
     std::size_t last_group_number{};
