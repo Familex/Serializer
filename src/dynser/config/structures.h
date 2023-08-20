@@ -4,6 +4,7 @@
 #include <unordered_map>
 
 #include <concepts>
+#include <cstdint>
 #include <expected>
 #include <optional>
 #include <string>

@@ -1,9 +1,13 @@
 # Visual studio CMake artifacts
 .vs/
 out/
+build/
 
 # My files
 .todo
 private_*
 private/
+
+# Other artifacts
+.cache/
 

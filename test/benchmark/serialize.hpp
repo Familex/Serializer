@@ -53,12 +53,12 @@ tags:
 
     REQUIRE(config_load_result);
 
-#define DYNSER_BENCHMARK_SERIALIZE_PROPS(ser_, props_, tag_, context_)                                                 \
-    BENCHMARK("Tag: "##tag_)                                                                                           \
+#define DYNSER_BENCHMARK_SERIALIZE_PROPS(ser_, props_, str_literal_tag_, context_)                                     \
+    BENCHMARK("Tag: " str_literal_tag_)                                                                                \
     {                                                                                                                  \
         const auto context = context_;                                                                                 \
         const auto props = props_;                                                                                     \
-        const auto tag = tag_;                                                                                         \
+        const auto tag = str_literal_tag_;                                                                             \
         ser_.context = context;                                                                                        \
         const auto result = ser.serialize_props(props, tag);                                                           \
         INFO(                                                                                                          \

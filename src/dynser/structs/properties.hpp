@@ -2,6 +2,7 @@
 
 #include "luwra.hpp"
 
+#include <cstdint>
 #include <any>
 #include <cassert>
 #include <map>

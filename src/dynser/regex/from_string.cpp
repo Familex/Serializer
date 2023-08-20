@@ -1,6 +1,8 @@
 #include "from_string.h"
 
+#include <cmath>
 #include <charconv>
+#include <utility>
 
 // regex::from_string impl
 namespace
@@ -21,7 +23,7 @@ constexpr auto inline svtoi(const std::string_view s) noexcept -> std::optional<
 template <typename T>
 auto inline number_len(T number) noexcept
 {
-    return static_cast<std::size_t>(trunc(log10(number))) + 1ull;
+    return static_cast<std::size_t>(std::trunc(std::log10(number))) + 1ull;
 }
 
 /**
