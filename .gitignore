@@ -8,6 +8,9 @@ build/
 private_*
 private/
 
+# Test prepared configs
+**/configs/*.yaml.raw
+
 # Other artifacts
 .cache/
 

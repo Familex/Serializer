@@ -6,6 +6,7 @@
 #include "recurrent.hpp"
 #include "recursive.hpp"
 #include "error_cases.hpp"
+#include "throw_lua_errors.hpp"
 #include "regex.hpp"
 // clang-format on
 

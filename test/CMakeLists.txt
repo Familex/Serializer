@@ -50,6 +50,24 @@ add_executable (
     serialize/tests.cpp
 )
 
+# FIXME add_dependencies doesn't work
+include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/process_configs.cmake")
+
+add_custom_target (
+    process-configs
+    COMMAND ${CMAKE_COMMAND} -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/process_configs.cmake"
+)
+
+add_dependencies (
+    serialize-tests
+    process-configs
+)
+
+add_dependencies (
+    benchmark-tests
+    process-configs
+)
+
 add_executable (
     catch-test
 

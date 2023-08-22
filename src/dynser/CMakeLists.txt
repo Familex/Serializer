@@ -9,7 +9,7 @@ add_library (
     "dynser/dynser.h" "dynser/dynser.cpp"
 
     "structs/fields.hpp"
-    "structs/properties.hpp"
+    "structs/properties.h" "structs/properties.cpp"
     "structs/context.hpp"
 
     "config/config.h" "config/config.cpp"

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "structs/properties.hpp"
+#include "structs/properties.h"
 
 #include <string>
 
@@ -10,7 +10,7 @@ namespace dynser::util
 constexpr auto infix{ "@" };
 
 template <typename Map>
-Map add_prefix(const Map& map, const std::string_view prefix) noexcept
+inline Map add_prefix(const Map& map, const std::string_view prefix) noexcept
 {
     Map result{};
     for (auto& [key, value] : map) {
@@ -20,7 +20,7 @@ Map add_prefix(const Map& map, const std::string_view prefix) noexcept
 }
 
 template <typename Map, typename... Prefixes>
-Map add_prefix(const Map& map, const std::string_view prefix, Prefixes&&... prefixes) noexcept
+inline Map add_prefix(const Map& map, const std::string_view prefix, Prefixes&&... prefixes) noexcept
 {
     return add_prefix(add_prefix(map, prefix), std::forward<Prefixes>(prefixes)...);
 }
@@ -29,7 +29,7 @@ Map add_prefix(const Map& map, const std::string_view prefix, Prefixes&&... pref
  * brief filders keys what starts with prefix and remove this prefix from it.
  */
 template <typename Map>
-Map remove_prefix(const Map& props, const std::string_view prefix) noexcept
+inline Map remove_prefix(const Map& props, const std::string_view prefix) noexcept
 {
     constexpr auto infix_size = std::string{ "@" }.size();
 
