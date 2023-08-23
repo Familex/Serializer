@@ -421,6 +421,11 @@ public:
     const TargetToPropertyMapper ttpm;
     Context context;
 
+    DynSer() noexcept
+      : pttm{ generate_property_to_target_mapper() }
+      , ttpm{ generate_target_to_property_mapper() }
+    { }
+
     DynSer(PropertyToTargetMapper&& pttm, TargetToPropertyMapper&& ttpm) noexcept
       : pttm{ std::move(pttm) }
       , ttpm{ std::move(ttpm) }
@@ -690,5 +695,8 @@ public:
         return {};
     }
 };
+
+// Deduction guide for empty constructor
+DynSer() -> DynSer<TargetToPropertyMapper<>, PropertyToTargetMapper<>>;
 
 }    // namespace dynser
