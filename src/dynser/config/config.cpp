@@ -1,5 +1,6 @@
 #include "config.h"
 
+#include "keywords.h"
 #include "yaml-cpp/yaml.h"
 
 #include <charconv>
@@ -8,13 +9,7 @@
 #include <optional>
 #include <regex>
 
-// debug print
-#ifdef _DEBUG
-#include <format>
-#include <iostream>
-#endif
-
-using namespace dynser::config;
+using namespace dynser;
 
 // https://stackoverflow.com/a/37516316
 namespace
@@ -61,7 +56,8 @@ std::string regex_replace(const std::string& s, const std::basic_regex<CharT, Tr
 }
 }    // namespace
 
-details::yaml::Regex details::resolve_dyn_regex(yaml::DynRegex&& dyn_reg, yaml::DynGroupValues&& dyn_gr_vals) noexcept
+config::yaml::Regex
+config::details::resolve_dyn_regex(const yaml::DynRegex& dyn_reg, const yaml::DynGroupValues& dyn_gr_vals) noexcept
 {
     static const std::regex dyn_gr_pattern{ R"(\\_(\d+))" };
     return { regex_replace(dyn_reg, dyn_gr_pattern, [&dyn_gr_vals](const std::smatch& m) {
@@ -73,18 +69,24 @@ details::yaml::Regex details::resolve_dyn_regex(yaml::DynRegex&& dyn_reg, yaml::
     }) };
 }
 
-details::regex::ToStringResult details::resolve_regex(yaml::Regex&& reg, yaml::GroupValues&& vals) noexcept
+regex::ToStringResult config::details::resolve_regex(const yaml::Regex& reg, const yaml::GroupValues& vals) noexcept
 {
-    using namespace details::regex;
+    using namespace dynser::regex;
 
-    const auto reg_sus = from_string(reg);
+    auto reg_sus = regex::from_string(reg);
     if (!reg_sus) {
         return std::unexpected{ ToStringError{
-            ToStringErrorType::RegexSyntaxError,
+            to_string_err::RegexSyntaxError{ reg_sus.error() },
             0    // group number
         } };
     }
-    return to_string(*reg_sus, std::move(vals));
+    const auto regex = !vals.contains(0)
+                           ? *reg_sus
+                           : Regex{ std::vector<Token>{ Group{ std::make_unique<Regex>(std::move(*reg_sus)),
+                                                               Quantifier{ 1, 1, false },
+                                                               std::regex{ reg.data(), reg.size() },
+                                                               0 } } };
+    return to_string(regex, vals);
 }
 
 // config::from_string helpers
@@ -92,7 +94,7 @@ namespace
 {
 
 template <typename Res>
-inline std::optional<Res> as_opt(YAML::Node const& node) noexcept
+inline std::optional<Res> as_opt(YAML::Node const& node) noexcept(false)    // throws YAML::BadConversion or anything
 {
     if (node.IsDefined()) {
         return node.as<Res>();
@@ -102,82 +104,138 @@ inline std::optional<Res> as_opt(YAML::Node const& node) noexcept
 
 }    // namespace
 
-std::optional<Config> dynser::config::from_string(const std::string_view sv) noexcept
+config::ParseResult config::from_string(const std::string_view sv) noexcept
 {
     try {
+        using namespace dynser::config;
+        using namespace dynser::config::yaml;
+
         const auto yaml = YAML::Load(std::string{ sv });
         Config result;
 
-        result.version = yaml["version"].as<std::string>();
+        result.version = yaml[keywords::VERSION].as<std::string>();
 
-        for (const auto tag : yaml["tags"]) {
-            const auto tag_name = tag["name"].as<std::string>();
+        for (const auto tag : yaml[keywords::TAGS]) {
+            const auto tag_name = tag[keywords::NAME].as<std::string>();
 
-            // clang-format off
-        result.tags[tag_name] = {
-            .name = tag_name,
-            .nested = [&]{
-                std::vector<details::yaml::Nested> result;
+            result.tags[tag_name] = {
+                .name = tag_name,
+                .nested = [&]() -> yaml::Nested {    // iife
+                    if (const auto continual = tag[keywords::NESTED_CONTINUAL]) {
+                        yaml::Continual nested;
 
-                for (const auto nested_type : tag["nested"]) {
-                    if (const auto nested = nested_type["existing"]) {
-                        result.push_back(details::yaml::Existing{
-                            .tag = nested["tag"].as<std::string>(),
-                            .prefix = as_opt<std::string>(nested["prefix"])
-                        });
-                    } else if (const auto nested = nested_type["linear"]) {
-                        result.push_back(details::yaml::Linear{
-                            .pattern = nested["pattern"].as<std::string>(),
-                            .dyn_groups = as_opt<details::yaml::DynGroupValues>(nested["dyn-groups"]),
-                            .fields = as_opt<details::yaml::GroupValues>(nested["fields"])
-                        });
-                    } else if (const auto nested = nested_type["branched"]) {
-                        const auto type{ nested["type"].as<std::string>() };
-                        if (type == "match-successfulness") {
-                            result.push_back(
-                                details::yaml::Branched{
-                                    details::yaml::BranchedMatchSuccessfulness{
-                                        .patterns = nested["patterns"].as<std::vector<details::yaml::Regex>>(),
-                                        .fields = as_opt<details::yaml::GroupValues>(nested["fields"])
-                                    }
-                                }
-                            );
-                        } else if (type == "script-variable") {
-                            result.push_back(
-                                details::yaml::Branched{
-                                    details::yaml::BranchedScriptVariable{
-                                        .variable = nested["variable"].as<std::string>(),
-                                        .script = nested["script"].as<std::string>(),
-                                        .patterns = nested["patterns"].as<details::yaml::BranchedScriptVariable::Patterns>(),
-                                        .fields = as_opt<details::yaml::GroupValues>(nested["fields"])
-                                    }
-                                }
-                            );
+                        for (const auto continual_rule_type : continual) {
+                            if (const auto rule = continual_rule_type[keywords::CONTINUAL_EXISTING]) {
+                                nested.push_back(ConExisting{
+                                    .tag = rule[keywords::CONTINUAL_EXISTING_TAG].as<std::string>(),
+                                    .prefix = as_opt<std::string>(rule[keywords::CONTINUAL_EXISTING_PREFIX]),
+                                    .required =
+                                        as_opt<bool>(rule[keywords::CONTINUAL_EXISTING_REQUIRED]).value_or(true) });
+                            }
+                            else if (const auto rule = continual_rule_type[keywords::CONTINUAL_LINEAR]) {
+                                nested.push_back(ConLinear{
+                                    .pattern = rule[keywords::CONTINUAL_LINEAR_PATTERN].as<std::string>(),
+                                    .dyn_groups = as_opt<DynGroupValues>(rule[keywords::CONTINUAL_LINEAR_DYN_GROUPS]),
+                                    .fields = as_opt<GroupValues>(rule[keywords::CONTINUAL_LINEAR_FIELDS]) });
+                            }
                         }
-                    } else if (const auto nested = nested_type["recurrent"]) {
-                        result.push_back(details::yaml::Linear{
-                            .pattern = nested["pattern"].as<std::string>(),
-                            .dyn_groups = as_opt<details::yaml::DynGroupValues>(nested["dyn-groups"]),
-                            .fields = as_opt<details::yaml::GroupValues>(nested["fields"])
-                        });
-                    }
-                }
 
-                return result;
-            }(),
-            .serialization_script = as_opt<details::yaml::Script>(tag["serialization-script"]),
-            .deserialization_script = as_opt<details::yaml::Script>(tag["deserialization-script"])
-        };
-            // clang-format on
+                        return nested;
+                    }
+                    else if (const auto branched = tag[keywords::NESTED_BRANCHED]) {
+                        Branched nested;
+
+                        nested.branching_script = branched[keywords::BRANCHED_BRANCHING_SCRIPT].as<std::string>();
+                        nested.debranching_script = branched[keywords::BRANCHED_DEBRANCHING_SCRIPT].as<std::string>();
+
+                        for (const auto branched_rule_type : branched[keywords::BRANCHED_RULES]) {
+                            if (const auto rule = branched_rule_type[keywords::BRANCHED_EXISTING]) {
+                                nested.rules.push_back(BraExisting{
+                                    .tag = rule[keywords::BRANCHED_EXISTING_TAG].as<std::string>(),
+                                    .prefix = as_opt<std::string>(rule[keywords::BRANCHED_EXISTING_PREFIX]),
+                                    .required =
+                                        as_opt<bool>(rule[keywords::BRANCHED_EXISTING_REQUIRED]).value_or(true) });
+                            }
+                            else if (const auto rule = branched_rule_type[keywords::BRANCHED_LINEAR]) {
+                                nested.rules.push_back(BraLinear{
+                                    .pattern = rule[keywords::BRANCHED_LINEAR_PATTERN].as<std::string>(),
+                                    .dyn_groups = as_opt<DynGroupValues>(rule[keywords::BRANCHED_LINEAR_DYN_GROUPS]),
+                                    .fields = as_opt<GroupValues>(rule[keywords::BRANCHED_LINEAR_FIELDS]) });
+                            }
+                        }
+
+                        return nested;
+                    }
+                    else if (const auto recurrent = tag[keywords::NESTED_RECURRENT]) {
+                        Recurrent nested;
+
+                        for (const auto recurrent_rule_type : recurrent) {
+                            if (const auto rule = recurrent_rule_type[keywords::RECURRENT_EXISTING]) {
+                                nested.push_back(RecExisting{
+                                    .tag = rule[keywords::RECURRENT_EXISTING_TAG].as<std::string>(),
+                                    .prefix = as_opt<std::string>(rule[keywords::RECURRENT_EXISTING_PREFIX]),
+                                    .required =
+                                        as_opt<bool>(rule[keywords::RECURRENT_EXISTING_REQUIRED]).value_or(true),
+                                    .wrap = as_opt<bool>(rule[keywords::RECURRENT_EXISTING_WRAP]).value_or(false),
+                                    .default_value =
+                                        as_opt<std::string>(rule[keywords::RECURRENT_EXISTING_DEFAULT_VALUE]),
+                                    .priority =
+                                        as_opt<PriorityType>(rule[keywords::RECURRENT_EXISTING_PRIORITY]).value_or(0),
+                                });
+                            }
+                            else if (const auto rule = recurrent_rule_type[keywords::RECURRENT_LINEAR]) {
+                                nested.push_back(RecLinear{
+                                    .pattern = rule[keywords::RECURRENT_LINEAR_PATTERN].as<std::string>(),
+                                    .dyn_groups = as_opt<DynGroupValues>(rule[keywords::RECURRENT_LINEAR_DYN_GROUPS]),
+                                    .fields = as_opt<GroupValues>(rule[keywords::RECURRENT_LINEAR_FIELDS]),
+                                    .wrap = as_opt<bool>(rule[keywords::RECURRENT_LINEAR_WRAP]).value_or(false),
+                                    .default_value =
+                                        as_opt<std::string>(rule[keywords::RECURRENT_LINEAR_DEFAULT_VALUE]),
+                                    .priority =
+                                        as_opt<PriorityType>(rule[keywords::RECURRENT_LINEAR_PRIORITY]).value_or(0),
+                                });
+                            }
+                            else if (const auto rule = recurrent_rule_type[keywords::RECURRENT_INFIX]) {
+                                nested.push_back(RecInfix{
+                                    .pattern = rule[keywords::RECURRENT_INFIX_PATTERN].as<std::string>(),
+                                    .dyn_groups = as_opt<DynGroupValues>(rule[keywords::RECURRENT_INFIX_DYN_GROUPS]),
+                                    .fields = as_opt<GroupValues>(rule[keywords::RECURRENT_INFIX_FIELDS]),
+                                    .wrap = as_opt<bool>(rule[keywords::RECURRENT_INFIX_WRAP]).value_or(false),
+                                    .default_value = as_opt<std::string>(rule[keywords::RECURRENT_INFIX_DEFAULT_VALUE]),
+                                });
+                            }
+                        }
+
+                        return nested;
+                    }
+                    else if (const auto recurrent_dict = tag[keywords::NESTED_RECURRENTDICT]) {
+                        return RecurrentDict{
+                            .key = recurrent_dict[keywords::RECURRENTDICT_KEY].as<std::string>(),
+                            .tag = recurrent_dict[keywords::RECURRENTDICT_TAG].as<std::string>(),
+                        };
+                    }
+
+                    std::unreachable();
+                }(),
+                .serialization_script = as_opt<Script>(tag[keywords::SERIALIZATION_SCRIPT]),
+                .deserialization_script = as_opt<Script>(tag[keywords::DESERIALIZATION_SCRIPT]),
+            };
         }
+
+        // FIXME logic validation (e.g. claim prefix if several existing of one tag)
 
         return result;
     }
-    catch ([[maybe_unused]] std::exception& e) {
-// debug print FIXME proper error handling
-#ifdef _DEBUG
-        std::cerr << std::format("{} error: {}", __FUNCTION__, e.what()) << std::endl;
-#endif
+    catch (YAML::ParserException& ex) {
+        return std::unexpected{ ParseError{ ParseError::Type::ParserException, ex.mark, ex.msg } };
     }
-    return std::nullopt;
+    catch (YAML::RepresentationException& ex) {
+        return std::unexpected{ ParseError{ ParseError::Type::RepresentationException, ex.mark, ex.msg } };
+    }
+    catch (YAML::Exception& ex) {
+        return std::unexpected{ ParseError{ ParseError::Type::UnknownYamlCppException, ex.mark, ex.msg } };
+    }
+    catch (...) {
+        return std::unexpected{ ParseError{ ParseError::Type::UnknownException } };
+    }
 }

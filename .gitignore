@@ -1,9 +1,16 @@
 # Visual studio CMake artifacts
 .vs/
 out/
+build/
 
 # My files
 .todo
 private_*
 private/
+
+# Test prepared configs
+**/configs/*.yaml.raw
+
+# Other artifacts
+.cache/
 

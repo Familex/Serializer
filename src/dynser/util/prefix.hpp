@@ -1,27 +1,42 @@
 #pragma once
 
-#include "structs/properties.hpp"
+#include "structs/properties.h"
 
 #include <string>
 
 namespace dynser::util
 {
 
-Properties add_prefix(Properties&& props, std::string_view prefix) noexcept
+constexpr auto infix{ "@" };
+
+template <typename Map>
+inline Map add_prefix(const Map& map, const std::string_view prefix) noexcept
 {
-    Properties result;
-    for (auto& [key, value] : props) {
-        result[prefix.data() + ('-' + key)] = std::move(value);
+    Map result{};
+    for (auto& [key, value] : map) {
+        result[prefix.data() + (infix + key)] = value;
     }
     return result;
 }
 
-Properties remove_prefix(Properties& props, std::string_view prefix) noexcept
+template <typename Map, typename... Prefixes>
+inline Map add_prefix(const Map& map, const std::string_view prefix, Prefixes&&... prefixes) noexcept
 {
-    Properties result;
+    return add_prefix(add_prefix(map, prefix), std::forward<Prefixes>(prefixes)...);
+}
+
+/**
+ * brief filders keys what starts with prefix and remove this prefix from it.
+ */
+template <typename Map>
+inline Map remove_prefix(const Map& props, const std::string_view prefix) noexcept
+{
+    constexpr auto infix_size = std::string{ "@" }.size();
+
+    Map result{};
     for (auto& [key, value] : props) {
         if (key.starts_with(prefix)) {
-            result.insert({ key.substr(prefix.size()), value });
+            result.insert({ key.substr(prefix.size() + infix_size), value });
         }
     }
     return result;

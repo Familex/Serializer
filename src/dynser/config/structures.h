@@ -1,7 +1,11 @@
 #pragma once
 
+#include "yaml-cpp/yaml.h"
 #include <unordered_map>
 
+#include <concepts>
+#include <cstdint>
+#include <expected>
 #include <optional>
 #include <string>
 #include <variant>
@@ -19,8 +23,10 @@ struct RawContents
     std::string config;
 };
 
-namespace details::yaml
+namespace yaml
 {
+using PriorityType = std::int32_t;
+
 using Regex = std::string;
 
 using DynRegex = std::string;
@@ -31,58 +37,142 @@ using DynGroupValues = std::unordered_map<std::size_t, std::string>;
 
 using Script = std::string;
 
-struct Existing
+struct ConExisting
 {
     std::string tag;
     std::optional<std::string> prefix;
+    bool required;
 };
 
-struct Linear
+struct BraExisting
 {
-    details::yaml::Regex pattern;
+    std::string tag;
+    std::optional<std::string> prefix;
+    bool required;
+};
+
+struct RecExisting
+{
+    std::string tag;
+    std::optional<std::string> prefix;
+    bool required;
+
+    bool wrap;
+    std::optional<std::string> default_value;
+    PriorityType priority;
+};
+
+struct ConLinear
+{
+    yaml::Regex pattern;
     std::optional<DynGroupValues> dyn_groups;
     std::optional<GroupValues> fields;
 };
 
-struct BranchedMatchSuccessfulness
+struct BraLinear
 {
-    std::vector<details::yaml::Regex> patterns;
+    yaml::Regex pattern;
+    std::optional<DynGroupValues> dyn_groups;
     std::optional<GroupValues> fields;
 };
 
-struct BranchedScriptVariable
+struct RecLinear
 {
-    using Patterns = std::unordered_map<std::string, details::yaml::Regex>;
-
-    std::string variable;
-    Script script;
-    Patterns patterns;
+    yaml::Regex pattern;
+    std::optional<DynGroupValues> dyn_groups;
     std::optional<GroupValues> fields;
+
+    bool wrap;
+    std::optional<std::string> default_value;
+    PriorityType priority;
 };
 
-using Branched = std::variant<BranchedMatchSuccessfulness, BranchedScriptVariable>;
+struct RecInfix
+{
+    yaml::Regex pattern;
+    std::optional<DynGroupValues> dyn_groups;
+    std::optional<GroupValues> fields;
 
-struct Recurrent : Linear
-{ };
+    bool wrap;
+    std::optional<std::string> default_value;
+};
 
-using Nested = std::variant<Existing, Linear, Branched, Recurrent>;
+using Continual = std::vector<std::variant<ConExisting, ConLinear>>;
+using Recurrent = std::vector<std::variant<RecExisting, RecLinear, RecInfix>>;
+struct Branched
+{
+    Script branching_script;
+    Script debranching_script;
+
+    using Rules = std::variant<BraExisting, BraLinear>;
+    std::vector<Rules> rules;
+};
+struct RecurrentDict
+{
+    std::string key;
+    std::string tag;
+};
+
+using Nested = std::variant<Continual, Recurrent, Branched, RecurrentDict>;
 
 struct Tag
 {
     std::string name;
-    std::vector<Nested> nested;
+    Nested nested;
     std::optional<Script> serialization_script;
     std::optional<Script> deserialization_script;
 };
 
 using Tags = std::unordered_map<std::string, Tag>;
 
-}    // namespace details::yaml
+template <typename Rule>
+concept HasPriority = requires(Rule const rule) {
+    {
+        rule.priority
+    } -> std::same_as<PriorityType const&>;
+};
+
+template <typename Rule>
+concept LikeExisting = requires(Rule const rule) {
+    {
+        rule.tag
+    } -> std::same_as<std::string const&>;
+};
+
+template <typename Rule>
+concept LikeLinear = requires(Rule const rule) {
+    {
+        rule.pattern
+    } -> std::same_as<Regex const&>;
+    {
+        rule.fields
+    } -> std::same_as<std::optional<GroupValues> const&>;
+};
+
+}    // namespace yaml
+
+// dynamic exceptions adapter
+struct ParseError
+{
+    enum class Type {
+        ParserException,
+        RepresentationException,
+        UnknownYamlCppException,
+        UnknownException,    // mark and msg invalid
+    } type;
+    YAML::Mark mark;
+    std::string msg;
+};
 
 struct Config
 {
     std::string version;
-    details::yaml::Tags tags;
+    yaml::Tags tags;
+
+    // merge tags and version from other config
+    void merge(Config&&) noexcept;
 };
+
+using ParseResult = std::expected<Config, ParseError>;
 
 }    // namespace dynser::config

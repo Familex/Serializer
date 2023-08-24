@@ -1,8 +1,8 @@
 #include "from_string.h"
 
+#include <cmath>
 #include <charconv>
-
-using namespace dynser::config;
+#include <utility>
 
 // regex::from_string impl
 namespace
@@ -23,13 +23,13 @@ constexpr auto inline svtoi(const std::string_view s) noexcept -> std::optional<
 template <typename T>
 auto inline number_len(T number) noexcept
 {
-    return static_cast<std::size_t>(trunc(log10(number))) + 1ull;
+    return static_cast<std::size_t>(std::trunc(std::log10(number))) + 1ull;
 }
 
 /**
  * \brief Return Quantifier if exists at sv start and add it length to out if provided.
  */
-std::optional<details::regex::Quantifier>
+std::optional<dynser::regex::Quantifier>
 search_quantifier(const std::string_view sv, std::size_t* out /* = nullptr */) noexcept
 {
     static const auto lazy_check = [](const std::string_view sv, const std::size_t offset) {
@@ -59,7 +59,7 @@ search_quantifier(const std::string_view sv, std::size_t* out /* = nullptr */) n
                 if (out) {
                     *out += quantifier_end + is_lazy + 1;
                 }
-                return details::regex::Quantifier{ *count_sus, *count_sus, is_lazy };
+                return dynser::regex::Quantifier{ *count_sus, *count_sus, is_lazy };
             }
             else {
                 const auto from_str = sv.substr(1, comma_pos - 1);
@@ -76,7 +76,7 @@ search_quantifier(const std::string_view sv, std::size_t* out /* = nullptr */) n
                 if (out) {
                     *out += quantifier_end + is_lazy + 1;
                 }
-                return details::regex::Quantifier{ *from_sus, has_to ? *to_sus : to_sus, is_lazy };
+                return dynser::regex::Quantifier{ *from_sus, has_to ? *to_sus : to_sus, is_lazy };
             }
         } break;
         case '+':
@@ -85,7 +85,7 @@ search_quantifier(const std::string_view sv, std::size_t* out /* = nullptr */) n
             if (out) {
                 *out += static_cast<std::size_t>(1) + is_lazy;
             }
-            return details::regex::Quantifier{ 1, std::nullopt, is_lazy };
+            return dynser::regex::Quantifier{ 1, std::nullopt, is_lazy };
         } break;
         case '*':
         {
@@ -93,7 +93,7 @@ search_quantifier(const std::string_view sv, std::size_t* out /* = nullptr */) n
             if (out) {
                 *out += static_cast<std::size_t>(1) + is_lazy;
             }
-            return details::regex::Quantifier{ 0, std::nullopt, is_lazy };
+            return dynser::regex::Quantifier{ 0, std::nullopt, is_lazy };
         } break;
         case '?':
         {
@@ -101,7 +101,7 @@ search_quantifier(const std::string_view sv, std::size_t* out /* = nullptr */) n
             if (out) {
                 *out += static_cast<std::size_t>(1) + is_lazy;
             }
-            return details::regex::Quantifier{ 0, 1, is_lazy };
+            return dynser::regex::Quantifier{ 0, 1, is_lazy };
         } break;
     }
     return std::nullopt;
@@ -158,24 +158,26 @@ find_paired_round_bracket(const std::string_view sv, const std::size_t resp_pos)
     return std::nullopt;
 }
 
-std::expected<details::regex::Regex, std::size_t>
+std::expected<dynser::regex::Regex, std::size_t>
 parse_regex(const std::string_view sv, std::size_t& last_group_number) noexcept;    // forward declaration
 
 /**
  * \brief Return parsed token (from sv begin) and it length or parse error position.
  */
-std::expected<std::pair<details::regex::Token, std::size_t>, std::size_t> parse_token(
+std::expected<std::pair<dynser::regex::Token, std::size_t>, std::size_t> parse_token(
     const std::string_view sv,
-    std::vector<details::regex::Token>& result,
+    std::vector<dynser::regex::Token>& result,
     std::size_t& last_group_number
 ) noexcept
 {
-    using namespace details::regex;
+    using namespace dynser::regex;
 
     std::size_t token_len{};
 
     if (sv.empty()) {
-        return std::unexpected{ token_len };
+        // we can fall in here on '||' regex by example
+        //                          ^^ empty after second disjunction
+        return { { Empty{}, token_len } };
     }
 
     switch (sv[0]) {
@@ -187,6 +189,10 @@ std::expected<std::pair<details::regex::Token, std::size_t>, std::size_t> parse_
         // escaped character
         case '\\':
             ++token_len;
+            if (sv.size() <= token_len) {
+                // backslash at the end of string (nothing to escape)
+                return std::unexpected{ token_len };
+            }
             if (std::isdigit(sv[token_len])) {
                 const auto backref = static_cast<std::size_t>(*svtoi(sv.substr(token_len)));
                 token_len += number_len(backref);
@@ -238,15 +244,16 @@ std::expected<std::pair<details::regex::Token, std::size_t>, std::size_t> parse_
         // disjunction
         case '|':
         {
-            auto right_sus = parse_token(sv.substr(1), result, last_group_number);
+            const auto right_start = 1ull;
+            auto right_sus = parse_token(sv.substr(right_start), result, last_group_number);
             if (!right_sus) {
-                return std::unexpected{ right_sus.error() };
+                return std::unexpected{ right_sus.error() + right_start };
             }
             auto&& [right, right_len] = std::move(*right_sus);
             if (result.empty()) {
                 return {
                     { { Disjunction{ std::make_unique<Token>(Empty{}), std::make_unique<Token>(std::move(right)) } },
-                      right_len + 1 }
+                      right_len + right_start }
                 };
             }
             else {
@@ -255,7 +262,7 @@ std::expected<std::pair<details::regex::Token, std::size_t>, std::size_t> parse_
                 return { { Disjunction{ std::make_unique<Token>(std::move(left)),
                                         std::make_unique<Token>(std::move(right)) },
 
-                           right_len + 1 } };
+                           right_len + right_start } };
             }
         }
         // illegal here (regex is context sensitive)
@@ -306,8 +313,12 @@ std::expected<std::pair<details::regex::Token, std::size_t>, std::size_t> parse_
                 return std::unexpected{ token_len };    // missmatched open bracket
             }
             const auto group_len = *group_end_sus - token_len;
-            const auto current_group_number =
-                ++last_group_number;    // remember own group number, 'cause numbering in BFS
+            std::optional<std::size_t> current_group_number{ std::nullopt };    // invalid if non-capturing group
+            if (!is_not_capturing) {
+                // remember own group number, 'cause numbering in BFS
+                ++last_group_number;
+                current_group_number = last_group_number;
+            }
             std::string group_str{ sv.substr(group_start, group_len) };
             auto group_sus = parse_regex(group_str, last_group_number);
             if (!group_sus) {
@@ -317,20 +328,38 @@ std::expected<std::pair<details::regex::Token, std::size_t>, std::size_t> parse_
             try {
                 regex = std::regex{ group_str.data(), group_str.size() };
             }
-            catch (const std::regex_error&) {
-                return std::unexpected{ group_start };
+            catch (const std::regex_error& regex_error) {
+                if (regex_error.code() == std::regex_constants::error_backref) {
+                    // FIXME cases like '(([smth])\2)\1' must be handled
+                    // separately cause if we are in 1st group in this
+                    // function, then backreference \2 is invalid
+                }
+                else {
+                    return std::unexpected{ group_start };
+                }
             }
             auto&& group = std::move(*group_sus);
             token_len += group_len + 1;    // skip ')'
-            return { { Group{ std::make_unique<Regex>(std::move(group)),
-                              !is_not_capturing,
-                              search_quantifier(sv.substr(token_len), &token_len).value_or(without_quantifier),
-                              std::move(regex),
-#ifdef _DEBUG
-                              std::move(group_str),
-#endif
-                              current_group_number },
-                       token_len } };
+            auto quantifier = search_quantifier(sv.substr(token_len), &token_len).value_or(without_quantifier);
+            if (is_not_capturing) {
+                return { { Token{ NonCapturingGroup{
+                               std::make_unique<Regex>(std::move(group)),
+                               std::move(quantifier),
+                               std::move(regex),
+                           } },
+                           token_len } };
+            }
+            else {
+                if (current_group_number) {
+                    return { { Group{ std::make_unique<Regex>(std::move(group)),
+                                      std::move(quantifier),
+                                      std::move(regex),
+                                      *current_group_number },
+                               token_len } };
+                }
+                // current_group_number must be valid in this scope
+                std::unreachable();
+            }
         }
         // string begin (how to handle)
         case '^':
@@ -344,10 +373,8 @@ std::expected<std::pair<details::regex::Token, std::size_t>, std::size_t> parse_
         // just character (like escaped)
         default:
             ++token_len;
-            std::string characters;
-            characters += sv[token_len - 1];    // FIXME make it in place (std::string{ 1, `char` }) doesn't worked
             return { { CharacterClass{
-                           characters,
+                           std::string(1, sv[token_len - 1]),
                            false,
                            search_quantifier(sv.substr(token_len), &token_len).value_or(without_quantifier) },
                        token_len } };
@@ -360,10 +387,9 @@ std::expected<std::pair<details::regex::Token, std::size_t>, std::size_t> parse_
  * \param [in,out] last_group_number last group number in parse process.
  * \return parsed regex.
  */
-std::expected<details::regex::Regex, std::size_t>
-parse_regex(const std::string_view sv, std::size_t& last_group_number) noexcept
+dynser::regex::ParseResult parse_regex(const std::string_view sv, std::size_t& last_group_number) noexcept
 {
-    using namespace details::regex;
+    using namespace dynser::regex;
 
     std::vector<Token> result;
     std::size_t curr{};
@@ -380,7 +406,7 @@ parse_regex(const std::string_view sv, std::size_t& last_group_number) noexcept
 }
 }    // namespace
 
-std::expected<details::regex::Regex, std::size_t> details::regex::from_string(const std::string_view sv) noexcept
+dynser::regex::ParseResult dynser::regex::from_string(const std::string_view sv) noexcept
 {
     // lvalue-reference to [in,out] param
     std::size_t last_group_number{};
